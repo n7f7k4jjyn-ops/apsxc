@@ -115,6 +115,31 @@ describe('financial CSV import', () => {
     ).toBe('dj:2')
   })
 
+  it('allows ignored spreadsheet IDs to retain historical references without blocking new rows', () => {
+    const recorded = entry({
+      externalId: 'old-row',
+      category: 'team',
+      beneficiaryId: 'team:old-registration',
+      eventId: 'old-event',
+      counterparty: 'Equipe histórica',
+    })
+    const csv =
+      'id;tipo;categoria;descricao;favorecido;beneficiario_id;evento_id;valor;vencimento\n' +
+      'old-row;pagar;equipe;Pagamento;Equipe histórica;team:old-registration;old-event;150;2026-10-25\n' +
+      'new-row;receber;geral;Venda;Cliente;;;10;2026-10-25'
+    const imported = parseFinanceCsv(csv, [], [recorded])
+    expect(imported).toHaveLength(2)
+    expect(imported[0]).toMatchObject({
+      externalId: 'old-row',
+      amountCents: recorded.amountCents,
+      beneficiaryId: 'team:old-registration',
+      eventId: 'old-event',
+    })
+    expect(imported[0]).not.toHaveProperty('history')
+    expect(imported[1].amountCents).toBe(1000)
+    expect(() => parseFinanceCsv(csv)).toThrow(/Profissional/)
+  })
+
   it('requires complete settlement data for paid or received rows', () => {
     const headers = [
       'id',
@@ -155,6 +180,9 @@ describe('financial CSV import', () => {
       /Somente/
     )
     expect(() => parseFinanceCsv(csv('incorreto', '', ''))).toThrow(
+      /Status inválido/
+    )
+    expect(() => parseFinanceCsv(csv('constructor', '', ''))).toThrow(
       /Status inválido/
     )
   })

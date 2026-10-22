@@ -90,32 +90,74 @@ const message = (cause: unknown) =>
     : 'Não foi possível concluir a operação.'
 const record = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
-function isLedger(value: unknown): value is Pick<FinanceData, 'revision' | 'entries'> & {
+function isLedger(value: unknown): value is Pick<
+  FinanceData,
+  'revision' | 'entries'
+> & {
   imported?: number
   skipped?: number
 } {
-  return record(value) && Number.isSafeInteger(value.revision) &&
-    Number(value.revision) >= 0 && Array.isArray(value.entries) &&
-    value.entries.every((entry) => record(entry) &&
-      ['id', 'externalId', 'description', 'counterparty', 'beneficiaryId', 'eventId',
-        'dueDate', 'settledDate', 'notes', 'createdAt', 'updatedAt'].every((key) => typeof entry[key] === 'string') &&
-      ['payable', 'receivable'].includes(String(entry.type)) &&
-      ['general', 'team', 'dj'].includes(String(entry.category)) &&
-      ['pending', 'settled', 'cancelled'].includes(String(entry.status)) &&
-      ['', 'cash', 'pix', 'transfer', 'card', 'other'].includes(String(entry.paymentMethod)) &&
-      Number.isSafeInteger(entry.amountCents) && Number(entry.amountCents) > 0 &&
-      Array.isArray(entry.history) && entry.history.every((item) => record(item) &&
-        ['action', 'actor', 'at'].every((key) => typeof item[key] === 'string')))
+  return (
+    record(value) &&
+    Number.isSafeInteger(value.revision) &&
+    Number(value.revision) >= 0 &&
+    Array.isArray(value.entries) &&
+    value.entries.every(
+      (entry) =>
+        record(entry) &&
+        [
+          'id',
+          'externalId',
+          'description',
+          'counterparty',
+          'beneficiaryId',
+          'eventId',
+          'dueDate',
+          'settledDate',
+          'notes',
+          'createdAt',
+          'updatedAt',
+        ].every((key) => typeof entry[key] === 'string') &&
+        ['payable', 'receivable'].includes(String(entry.type)) &&
+        ['general', 'team', 'dj'].includes(String(entry.category)) &&
+        ['pending', 'settled', 'cancelled'].includes(String(entry.status)) &&
+        ['', 'cash', 'pix', 'transfer', 'card', 'other'].includes(
+          String(entry.paymentMethod)
+        ) &&
+        Number.isSafeInteger(entry.amountCents) &&
+        Number(entry.amountCents) > 0 &&
+        Array.isArray(entry.history) &&
+        entry.history.every(
+          (item) =>
+            record(item) &&
+            ['action', 'actor', 'at'].every(
+              (key) => typeof item[key] === 'string'
+            )
+        )
+    )
+  )
 }
 function isFinanceData(value: unknown): value is FinanceData {
-  return isLedger(value) && record(value) &&
-    Array.isArray(value.beneficiaries) &&
-    value.beneficiaries.every((person) => record(person) &&
-      typeof person.id === 'string' && typeof person.name === 'string' &&
-      ['team', 'dj'].includes(String(person.kind)) &&
-      (person.pixKey === undefined || typeof person.pixKey === 'string')) &&
-    Array.isArray(value.events) && value.events.every((event) => record(event) &&
-      ['id', 'name', 'date'].every((key) => typeof event[key] === 'string'))
+  if (!record(value)) return false
+  const { beneficiaries, events } = value
+  return (
+    isLedger(value) &&
+    Array.isArray(beneficiaries) &&
+    beneficiaries.every(
+      (person) =>
+        record(person) &&
+        typeof person.id === 'string' &&
+        typeof person.name === 'string' &&
+        ['team', 'dj'].includes(String(person.kind)) &&
+        (person.pixKey === undefined || typeof person.pixKey === 'string')
+    ) &&
+    Array.isArray(events) &&
+    events.every(
+      (event) =>
+        record(event) &&
+        ['id', 'name', 'date'].every((key) => typeof event[key] === 'string')
+    )
+  )
 }
 function download(text: string, name: string) {
   const url = URL.createObjectURL(
@@ -311,11 +353,10 @@ function AdminFinance() {
       }
       const result = await response.json()
       if (!response.ok) {
-        uncertain = false
+        uncertain = response.status >= 500
         throw new Error(result.error || 'Não foi possível salvar o lançamento.')
       }
-      if (!isLedger(result))
-        throw new Error('Resposta da gravação inválida.')
+      if (!isLedger(result)) throw new Error('Resposta da gravação inválida.')
       if (!active.current) return false
       setData(
         (current) =>
@@ -335,7 +376,9 @@ function AdminFinance() {
       if (active.current) {
         if (uncertain) {
           setConflict(true)
-          setError('Resultado da gravação não confirmado. Solicitamos os dados atuais; confira os lançamentos existentes antes de revisar e tentar novamente. Nada foi reenviado.')
+          setError(
+            'Resultado da gravação não confirmado. Solicitamos os dados atuais; confira os lançamentos existentes antes de revisar e tentar novamente. Nada foi reenviado.'
+          )
           await load()
         } else setError(message(cause))
       }
@@ -420,16 +463,17 @@ function AdminFinance() {
       const text = new TextDecoder('utf-8', { fatal: true }).decode(
         await file.arrayBuffer()
       )
-      const rows = parseFinanceCsv(text, data.beneficiaries)
-      if (
-        rows.some(
-          (row) =>
-            row.eventId &&
-            !data.events.some((event) => event.id === row.eventId)
-        )
-      ) {
+      const rows = parseFinanceCsv(text, data.beneficiaries, data.entries)
+      const existingIds = new Set(data.entries.map((entry) => entry.externalId))
+      const invalidEventIndex = rows.findIndex(
+        (row) =>
+          !existingIds.has(row.externalId) &&
+          row.eventId &&
+          !data.events.some((event) => event.id === row.eventId)
+      )
+      if (invalidEventIndex !== -1) {
         throw new Error(
-          `Linha ${rows.findIndex((row) => row.eventId && !data.events.some((event) => event.id === row.eventId)) + 2}: evento_id não encontrado.`
+          `Linha ${invalidEventIndex + 2}: evento_id não encontrado.`
         )
       }
       setPreview(rows)
@@ -586,7 +630,12 @@ function AdminFinance() {
             </select>
           </Field>
         </div>
-        {periodError && <p role='alert'>{periodError}</p>}
+        {reportError && (
+          <p role='alert'>
+            Relatório indisponível: {reportError} Ajuste o período ou os dados
+            antes de operar.
+          </p>
+        )}
         <p>
           Lista por vencimento; caixa por data da baixa. Sem datas selecionadas,
           considera todo o histórico.
@@ -697,7 +746,7 @@ function AdminFinance() {
             />
           </Field>
         </div>
-        {valid && !periodError && (
+        {valid && !reportError && (
           <div className='finance-table'>
             <table>
               <caption>
@@ -773,14 +822,16 @@ function AdminFinance() {
                             </Button>
                           </>
                         )}
-                        {entry.status === 'settled' && (
+                        {entry.status !== 'pending' && (
                           <Button
                             variant='outline'
                             disabled={disabled}
                             onClick={() => setAction({ entry, kind: 'reopen' })}
                             aria-label={`Reabrir ${entry.description}`}
                           >
-                            Estornar / reabrir
+                            {entry.status === 'settled'
+                              ? 'Estornar / reabrir'
+                              : 'Reabrir'}
                           </Button>
                         )}
                       </div>
@@ -1048,9 +1099,23 @@ function AdminFinance() {
                           (item) => item.id === e.target.value
                         )
                         if (person) change('counterparty', person.name)
+                        else if (editing?.beneficiaryId === e.target.value)
+                          change('counterparty', editing.counterparty)
                       }}
                     >
                       <option value=''>Selecione</option>
+                      {editing?.beneficiaryId &&
+                        editing.category === draft.category &&
+                        !data?.beneficiaries.some(
+                          (person) =>
+                            person.id === editing.beneficiaryId &&
+                            person.kind === draft.category
+                        ) && (
+                          <option value={editing.beneficiaryId}>
+                            {editing.counterparty} · {editing.beneficiaryId}{' '}
+                            (cadastro histórico indisponível)
+                          </option>
+                        )}
                       {data?.beneficiaries
                         .filter((person) => person.kind === draft.category)
                         .map((person) => (
@@ -1097,6 +1162,15 @@ function AdminFinance() {
                     onChange={(e) => change('eventId', e.target.value)}
                   >
                     <option value=''>Sem evento</option>
+                    {editing?.eventId &&
+                      !data?.events.some(
+                        (event) => event.id === editing.eventId
+                      ) && (
+                        <option value={editing.eventId}>
+                          Evento histórico · {editing.eventId} (fora do
+                          cadastro)
+                        </option>
+                      )}
                     {data?.events.map((event) => (
                       <option key={event.id} value={event.id}>
                         {event.name} · {event.id}
@@ -1104,10 +1178,18 @@ function AdminFinance() {
                     ))}
                   </select>
                 </Field>
-                <Field id='finance-external' label='ID externo (opcional)'>
+                <Field
+                  id='finance-external'
+                  label={
+                    editingId
+                      ? 'ID externo (opcional)'
+                      : 'ID externo (automático)'
+                  }
+                >
                   <Input
                     id='finance-external'
                     maxLength={160}
+                    readOnly={!editingId}
                     value={draft.externalId}
                     onChange={(e) => change('externalId', e.target.value)}
                   />
@@ -1161,7 +1243,9 @@ function AdminFinance() {
                 ? 'Registrar baixa'
                 : action?.kind === 'cancel'
                   ? 'Cancelar lançamento'
-                  : 'Estornar e reabrir lançamento'}
+                  : action?.entry.status === 'cancelled'
+                    ? 'Reabrir lançamento cancelado'
+                    : 'Estornar e reabrir lançamento'}
             </DialogTitle>
             <DialogDescription>
               {action?.entry.description} ·{' '}
@@ -1230,7 +1314,9 @@ function AdminFinance() {
             ) : (
               <p>
                 {action?.kind === 'reopen'
-                  ? 'Confirma o estorno do registro? A conta voltará a pendente e os dados de baixa serão limpos, preservando o histórico de auditoria.'
+                  ? action.entry.status === 'cancelled'
+                    ? 'Confirma a reabertura do lançamento cancelado? A conta voltará a pendente, preservando o histórico de auditoria. Nenhum estorno bancário será realizado.'
+                    : 'Confirma o estorno do registro? A conta voltará a pendente e os dados de baixa serão limpos, preservando o histórico de auditoria.'
                   : 'Confirma o cancelamento? O lançamento será mantido no histórico, sem exclusão.'}
               </p>
             )}

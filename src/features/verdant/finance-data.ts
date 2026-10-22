@@ -156,14 +156,18 @@ function csvEnum<T extends string>(
   choices: Record<string, T>,
   label: string
 ): T {
-  const result = choices[normalize(value)]
+  const key = normalize(value)
+  const result = Object.prototype.hasOwnProperty.call(choices, key)
+    ? choices[key]
+    : undefined
   if (!result) throw new Error(`${label} inválido: "${value}".`)
   return result
 }
 
 export function parseFinanceCsv(
   text: string,
-  beneficiaries: FinanceBeneficiary[] = []
+  beneficiaries: FinanceBeneficiary[] = [],
+  existingEntries: FinanceEntry[] = []
 ): FinanceDraft[] {
   const [header, ...rows] = csvRows(text)
   if (!header || !rows.length)
@@ -193,6 +197,11 @@ export function parseFinanceCsv(
       )
   }
   const seen = new Set<string>()
+  const existing = new Map(
+    existingEntries
+      .filter((entry) => entry.externalId)
+      .map((entry) => [entry.externalId, entry])
+  )
   return rows.map((row, index) => {
     try {
       if (row.length !== header.length)
@@ -204,6 +213,17 @@ export function parseFinanceCsv(
       if (seen.has(externalId))
         throw new Error(`ID externo repetido: ${externalId}.`)
       seen.add(externalId)
+      const previous = existing.get(externalId)
+      if (previous) {
+        const {
+          id: _id,
+          history: _history,
+          createdAt: _createdAt,
+          updatedAt: _updatedAt,
+          ...recorded
+        } = previous
+        return recorded
+      }
       const type = csvEnum(
         get('type'),
         {

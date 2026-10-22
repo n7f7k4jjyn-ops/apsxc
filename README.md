@@ -146,7 +146,7 @@ Exporte a planilha do Excel ou Google Sheets como **CSV UTF-8**, separado por po
 | `beneficiario_id` | ID de equipe/DJ, disponível nas referências. Pode ficar vazio se o nome corresponder a um único profissional da categoria. |
 | `observacoes` | Observações opcionais; textos com separadores ou quebras de linha devem estar entre aspas CSV. |
 
-Cada arquivo aceita até 1.000 lançamentos e 2 MiB. A leitura mostra uma prévia e **não grava nada sem confirmação**. Uma linha inválida impede a gravação do lote inteiro. IDs externos já existentes são ignorados, sem substituir registros: mantenha esses IDs ao exportar novamente a mesma planilha e use a edição de pendentes para corrigir valores. Não reutilize um ID para contas diferentes. A importação não modifica a planilha original e não mantém sincronização automática com ela.
+Cada arquivo aceita até 1.000 lançamentos e 2 MiB. A leitura mostra uma prévia e **não grava nada sem confirmação**. Uma linha nova inválida impede a gravação do lote inteiro. IDs externos já existentes são ignorados, sem substituir registros: a prévia conserva os dados já gravados desses IDs, inclusive referências históricas de eventos ou profissionais. Mantenha esses IDs ao exportar novamente a mesma planilha e use a edição de pendentes para corrigir valores. Não reutilize um ID para contas diferentes. A importação não modifica a planilha original e não mantém sincronização automática com ela.
 
 ### Persistência e implantação
 

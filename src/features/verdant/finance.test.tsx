@@ -99,6 +99,139 @@ describe('FinancePage', () => {
       .not.toBeInTheDocument()
   })
 
+  it('rejects malformed GET data without rendering a broken ledger', async () => {
+    fetchMock.mockResolvedValue(
+      json({ revision: 1, entries: [], beneficiaries: null, events: [] })
+    )
+    const screen = await render(<FinancePage />)
+    await expect
+      .element(
+        screen.getByText(
+          'Resposta financeira inválida. Saldos não confirmados.'
+        )
+      )
+      .toBeInTheDocument()
+    await expect
+      .element(screen.getByRole('button', { name: 'Novo lançamento' }))
+      .toBeDisabled()
+    await expect
+      .element(screen.getByRole('button', { name: 'Exportar CSV' }))
+      .toBeDisabled()
+  })
+
+  it('reports unsafe totals and disables operations instead of crashing render', async () => {
+    fetchMock.mockResolvedValue(
+      json({
+        ...data(),
+        entries: [
+          { ...entry, amountCents: Number.MAX_SAFE_INTEGER },
+          { ...entry, id: 'finance-2', amountCents: Number.MAX_SAFE_INTEGER },
+        ],
+      })
+    )
+    const screen = await render(<FinancePage />)
+    await expect
+      .element(screen.getByText(/Relatório indisponível:/))
+      .toBeInTheDocument()
+    await expect
+      .element(screen.getByRole('heading', { name: 'Caixa registrado' }))
+      .not.toBeInTheDocument()
+    await expect
+      .element(screen.getByRole('button', { name: 'Novo lançamento' }))
+      .toBeDisabled()
+    await expect
+      .element(screen.getByRole('button', { name: 'Exportar CSV' }))
+      .toBeDisabled()
+  })
+
+  it('disables mutations and export for an invalid report period', async () => {
+    const screen = await render(<FinancePage />)
+    await expect
+      .element(screen.getByRole('button', { name: 'Novo lançamento' }))
+      .toBeEnabled()
+    await userEvent.fill(screen.getByLabelText('Data inicial'), '2026-10-31')
+    await userEvent.fill(screen.getByLabelText('Data final'), '2026-10-01')
+    await expect
+      .element(screen.getByText(/Relatório indisponível:/))
+      .toBeInTheDocument()
+    await expect
+      .element(screen.getByRole('button', { name: 'Novo lançamento' }))
+      .toBeDisabled()
+    await expect
+      .element(screen.getByRole('button', { name: 'Exportar CSV' }))
+      .toBeDisabled()
+  })
+
+  it('preserves a manual id after an unknown mutation result and requires review before reapplying', async () => {
+    let latest = data()
+    const posts: { revision: number; entries: FinanceEntry[] }[] = []
+    fetchMock.mockImplementation(async (_url: string, init?: RequestInit) => {
+      if (!init?.method) return json(latest)
+      const body = JSON.parse(init.body as string)
+      posts.push(body)
+      if (posts.length === 1) {
+        latest = {
+          ...latest,
+          revision: 2,
+          entries: [
+            ...latest.entries,
+            { ...entry, ...body.entries[0], id: 'saved-but-response-lost' },
+          ],
+        }
+        throw new TypeError('Failed to fetch')
+      }
+      return json({ ...latest, imported: 0, skipped: 1 })
+    })
+    const screen = await render(<FinancePage />)
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Novo lançamento' })
+    )
+    const id = screen.getByLabelText('ID externo (automático)')
+    await expect.element(id).toHaveAttribute('readonly')
+    await userEvent.fill(
+      screen.getByLabelText('Descrição', { exact: true }),
+      'Registro seguro'
+    )
+    await userEvent.fill(
+      screen.getByLabelText('Favorecido / contraparte'),
+      'Loja'
+    )
+    await userEvent.fill(
+      screen.getByLabelText('Valor (R$)', { exact: true }),
+      '50,00'
+    )
+    await userEvent.fill(
+      screen.getByLabelText('Vencimento', { exact: true }),
+      '2026-10-25'
+    )
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Salvar lançamento' })
+    )
+    await expect
+      .element(
+        screen.getByRole('button', {
+          name: 'Revisar versão atual do formulário',
+        })
+      )
+      .toBeEnabled()
+    expect(posts).toHaveLength(1)
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+    expect(posts[0].entries[0].externalId).toMatch(/^manual:/)
+    await expect
+      .element(screen.getByRole('button', { name: 'Salvar lançamento' }))
+      .toBeDisabled()
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Revisar versão atual do formulário' })
+    )
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Salvar lançamento' })
+    )
+    await expect.element(screen.getByRole('dialog')).not.toBeInTheDocument()
+    expect(posts).toHaveLength(2)
+    expect(posts[1].entries[0].externalId).toBe(posts[0].entries[0].externalId)
+    expect(posts[1].revision).toBe(2)
+  })
+
   it('creates a localized manual account only on explicit save', async () => {
     fetchMock.mockImplementation(async (_url: string, init?: RequestInit) => {
       if (!init?.method) return json(data())
@@ -301,6 +434,100 @@ describe('FinancePage', () => {
     expect(fetchMock.mock.calls[1][1].body).not.toContain('pix-privado')
   })
 
+  it('reopens a cancelled account without claiming a bank reversal', async () => {
+    const cancelled = { ...entry, status: 'cancelled' as const }
+    fetchMock.mockImplementation(async (_url: string, init?: RequestInit) => {
+      if (!init?.method) return json({ ...data(), entries: [cancelled] })
+      return json({
+        revision: 2,
+        entries: [{ ...cancelled, ...JSON.parse(init.body as string) }],
+      })
+    })
+    const screen = await render(<FinancePage />)
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Reabrir Aluguel do espaço' })
+    )
+    await expect
+      .element(
+        screen.getByRole('heading', { name: 'Reabrir lançamento cancelado' })
+      )
+      .toBeInTheDocument()
+    await expect
+      .element(screen.getByText(/Nenhum estorno bancário será realizado/))
+      .toBeInTheDocument()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Confirmar reabertura' })
+    )
+    await expect
+      .element(screen.getByRole('button', { name: 'Baixar Aluguel do espaço' }))
+      .toBeInTheDocument()
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toMatchObject({
+      status: 'pending',
+      settledDate: '',
+      paymentMethod: '',
+      amountCents: cancelled.amountCents,
+    })
+  })
+
+  it('preserves historical person and event references missing from current options', async () => {
+    const historical = {
+      ...entry,
+      category: 'team' as const,
+      beneficiaryId: 'team:historical',
+      counterparty: 'Pessoa histórica',
+      eventId: 'event:historical',
+    }
+    fetchMock.mockImplementation(async (_url: string, init?: RequestInit) => {
+      if (!init?.method) return json({ ...data(), entries: [historical] })
+      return json({
+        revision: 2,
+        entries: [{ ...historical, ...JSON.parse(init.body as string) }],
+      })
+    })
+    const screen = await render(<FinancePage />)
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Detalhes de Aluguel do espaço' })
+    )
+    const beneficiary = screen.getByLabelText('Beneficiário', { exact: true })
+    const event = screen.getByLabelText('Vincular evento (opcional)')
+    await expect.element(beneficiary).toHaveValue('team:historical')
+    await expect.element(event).toHaveValue('event:historical')
+    await expect
+      .element(
+        screen.getByRole('option', {
+          name: 'Pessoa histórica · team:historical (cadastro histórico indisponível)',
+        })
+      )
+      .toBeInTheDocument()
+    await expect
+      .element(
+        screen.getByRole('option', {
+          name: 'Evento histórico · event:historical (fora do cadastro)',
+        })
+      )
+      .toBeInTheDocument()
+    await userEvent.selectOptions(beneficiary, 'team:1')
+    await userEvent.selectOptions(beneficiary, 'team:historical')
+    await expect
+      .element(screen.getByLabelText('Favorecido / contraparte'))
+      .toHaveValue('Pessoa histórica')
+    await userEvent.fill(
+      screen.getByLabelText('Descrição', { exact: true }),
+      'Diária histórica corrigida'
+    )
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Salvar lançamento' })
+    )
+    await expect.element(screen.getByRole('dialog')).not.toBeInTheDocument()
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toMatchObject({
+      beneficiaryId: historical.beneficiaryId,
+      eventId: historical.eventId,
+      counterparty: historical.counterparty,
+      description: 'Diária histórica corrigida',
+    })
+  })
+
   it('uses due dates in the ledger and settlement dates in cash reports', async () => {
     fetchMock.mockResolvedValue(
       json({
@@ -387,6 +614,84 @@ describe('FinancePage', () => {
         screen.getByRole('button', { name: 'Detalhes de Aluguel do espaço' })
       )
       .toBeInTheDocument()
+    await expect
+      .element(screen.getByRole('button', { name: 'Confirmar importação' }))
+      .not.toBeInTheDocument()
+  })
+
+  it('previews known historical duplicates alongside new valid rows without requiring archived references', async () => {
+    const historical = {
+      ...entry,
+      externalId: 'old-csv-1',
+      category: 'team' as const,
+      beneficiaryId: 'team:archived',
+      eventId: 'event:archived',
+      counterparty: 'Pessoa arquivada',
+    }
+    fetchMock.mockImplementation(async (_url: string, init?: RequestInit) => {
+      if (!init?.method) return json({ ...data(), entries: [historical] })
+      const body = JSON.parse(init.body as string)
+      return json({
+        revision: 2,
+        imported: 1,
+        skipped: 1,
+        entries: [
+          historical,
+          { ...entry, ...body.entries[1], id: 'new-csv-1' },
+        ],
+      })
+    })
+    const screen = await render(<FinancePage />)
+    await expect
+      .element(screen.getByRole('button', { name: 'Novo lançamento' }))
+      .toBeEnabled()
+    await selectCsv(
+      [
+        'id_externo;tipo;categoria;descricao;favorecido;valor;vencimento;evento_id;beneficiario_id',
+        'old-csv-1;pagar;equipe;Histórico repetido;Pessoa arquivada;123,45;2026-10-25;event:archived;team:archived',
+        'new-csv-1;receber;geral;Nova receita;Cliente;50,00;2026-10-25;event:1;',
+      ].join('\n')
+    )
+    await expect
+      .element(screen.getByRole('heading', { name: 'Prévia: 2 lançamento(s)' }))
+      .toBeInTheDocument()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Confirmar importação' })
+    )
+    await expect
+      .element(
+        screen.getByText(
+          '1 lançamento(s) incluído(s); 1 duplicado(s) ignorado(s).'
+        )
+      )
+      .toBeInTheDocument()
+    const body = JSON.parse(fetchMock.mock.calls[1][1].body)
+    expect(body.entries[0]).toMatchObject({
+      externalId: historical.externalId,
+      beneficiaryId: historical.beneficiaryId,
+      eventId: historical.eventId,
+      description: historical.description,
+    })
+    expect(body.entries[1]).toMatchObject({
+      externalId: 'new-csv-1',
+      eventId: 'event:1',
+      amountCents: 5000,
+    })
+  })
+
+  it('still rejects new imported rows referencing an unknown event', async () => {
+    const screen = await render(<FinancePage />)
+    await expect
+      .element(screen.getByRole('button', { name: 'Novo lançamento' }))
+      .toBeEnabled()
+    await selectCsv(
+      'id_externo;tipo;descricao;favorecido;valor;vencimento;evento_id\nnew-csv-1;pagar;Nova conta;Loja;20,00;2026-10-25;event:unknown'
+    )
+    await expect
+      .element(screen.getByText('Linha 2: evento_id não encontrado.'))
+      .toBeInTheDocument()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
     await expect
       .element(screen.getByRole('button', { name: 'Confirmar importação' }))
       .not.toBeInTheDocument()
