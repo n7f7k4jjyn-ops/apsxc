@@ -12,6 +12,7 @@ const navigationOptions = [
   { id: '/verdant/agenda', label: 'Agenda de eventos' },
   { id: '/verdant/conteudo', label: 'Conteúdo' },
   { id: '/verdant/escalas', label: 'Escalas' },
+  { id: '/verdant/financeiro', label: 'Financeiro' },
   { id: '/verdant/cadastros', label: 'Cadastros' },
   { id: '/verdant/formularios', label: 'Formulários' },
   { id: '/verdant/listas', label: 'Listas' },
@@ -73,4 +74,3 @@ export function DisplayForm() {
     <Button type='button' disabled={loading || saving} onClick={() => void save()}>{saving ? translate('Salvando…') : translate('Salvar exibição')}</Button>
   </div>
 }
-

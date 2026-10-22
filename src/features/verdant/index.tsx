@@ -1,4 +1,5 @@
 import { RostersPage } from './rosters'
+import { FinancePage } from './finance'
 import { birthdayDoorGroup, birthdayGuestNames } from './birthday-guests'
 import { professionalDoorList } from './professional-door-list'
 import type { PortariaSection } from './portaria-pdf'
@@ -74,7 +75,7 @@ import { getCurrentLanguage, LocalizedText, useLanguage } from '@/context/langua
 import { getCalendarDays } from './calendar-utils'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 
-type Section = 'escalas' | 'cadastros' | 'agenda' | 'formularios' | 'listas' | 'respostas' | 'clientes' | 'djs' | 'influencers' | 'exportacoes' | 'configuracoes'
+type Section = 'financeiro' | 'escalas' | 'cadastros' | 'agenda' | 'formularios' | 'listas' | 'respostas' | 'clientes' | 'djs' | 'influencers' | 'exportacoes' | 'configuracoes'
 
 const slugByForm: Record<FormKey, string> = {
   DJS: 'djs',
@@ -86,6 +87,7 @@ const slugByForm: Record<FormKey, string> = {
 }
 
 const sectionInfo: Record<Section, { title: string; description: string }> = {
+  financeiro: { title: 'Financeiro', description: 'Contas a pagar e receber, caixa e pagamentos de equipe e DJs.' },
   escalas: {title:'Escalas',description:'Equipe, postos e jornadas por data.'},
   cadastros: { title: 'Cadastros', description: 'Pessoas, contatos e histórico da operação.' },
   agenda: { title: 'Agenda de eventos', description: 'Cadastre qualquer data, inclusive feriados, e configure suas listas por evento.' },
@@ -269,6 +271,7 @@ export function VerdantWorkspace({ sectionName }: { sectionName?: string }) {
           {!ready && <span className='ms-2'>{<LocalizedText text={"· carregando"} />}</span>}
         </div>
         {section === 'escalas' && <RostersPage data={data} />}
+        {section === 'financeiro' && <FinancePage />}
         {section === 'agenda' && <AgendaPage data={data} update={update} />}
         {section === 'formularios' && <FormsPage data={data} update={update} />}
         {section === 'listas' && <ListsPage data={data} update={update} />}
@@ -1916,4 +1919,3 @@ function SettingsPage({ data }: { data: VerdantState }) {
     </>
   )
 }
-

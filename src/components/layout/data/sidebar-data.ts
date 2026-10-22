@@ -23,6 +23,7 @@ import {
   CalendarDays,
   ClipboardList,
   PanelsTopLeft,
+  Wallet,
 } from 'lucide-react'
 import { type SidebarData } from '../types'
 
@@ -82,6 +83,7 @@ export const sidebarData: SidebarData = {
         { title: 'Agenda de eventos', url: '/verdant/agenda', icon: CalendarDays },
         { title: 'Conteúdo', url: '/verdant/conteudo', icon: PanelsTopLeft },
         { title: 'Escalas', url: '/verdant/escalas', icon: ClipboardList },
+        { title: 'Financeiro', url: '/verdant/financeiro', icon: Wallet },
         { title: 'Formulários', url: '/verdant/formularios', icon: ClipboardList },
         { title: 'Listas', url: '/verdant/listas', icon: ClipboardList },
         { title: 'Respostas', url: '/verdant/respostas', icon: ClipboardList },
@@ -168,4 +170,3 @@ export const sidebarData: SidebarData = {
     },
   ],
 }
-

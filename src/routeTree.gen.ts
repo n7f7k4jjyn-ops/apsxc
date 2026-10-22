@@ -47,6 +47,7 @@ import { Route as AuthenticatedVerdantConteudoRouteImport } from './routes/_auth
 import { Route as AuthenticatedVerdantDjsRouteImport } from './routes/_authenticated/verdant/djs'
 import { Route as AuthenticatedVerdantEscalasRouteImport } from './routes/_authenticated/verdant/escalas'
 import { Route as AuthenticatedVerdantExportacoesRouteImport } from './routes/_authenticated/verdant/exportacoes'
+import { Route as AuthenticatedVerdantFinanceiroRouteImport } from './routes/_authenticated/verdant/financeiro'
 import { Route as AuthenticatedVerdantFormulariosRouteImport } from './routes/_authenticated/verdant/formularios'
 import { Route as AuthenticatedVerdantInfluencersRouteImport } from './routes/_authenticated/verdant/influencers'
 import { Route as AuthenticatedVerdantInscricoesRouteImport } from './routes/_authenticated/verdant/inscricoes'
@@ -234,11 +235,12 @@ const AuthenticatedVerdantConfiguracoesRoute =
     path: '/verdant/configuracoes',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedVerdantConteudoRoute = AuthenticatedVerdantConteudoRouteImport.update({
-  id: '/verdant/conteudo',
-  path: '/verdant/conteudo',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
+const AuthenticatedVerdantConteudoRoute =
+  AuthenticatedVerdantConteudoRouteImport.update({
+    id: '/verdant/conteudo',
+    path: '/verdant/conteudo',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedVerdantDjsRoute = AuthenticatedVerdantDjsRouteImport.update({
   id: '/verdant/djs',
   path: '/verdant/djs',
@@ -254,6 +256,12 @@ const AuthenticatedVerdantExportacoesRoute =
   AuthenticatedVerdantExportacoesRouteImport.update({
     id: '/verdant/exportacoes',
     path: '/verdant/exportacoes',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedVerdantFinanceiroRoute =
+  AuthenticatedVerdantFinanceiroRouteImport.update({
+    id: '/verdant/financeiro',
+    path: '/verdant/financeiro',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedVerdantFormulariosRoute =
@@ -272,6 +280,18 @@ const AuthenticatedVerdantInscricoesRoute =
   AuthenticatedVerdantInscricoesRouteImport.update({
     id: '/verdant/inscricoes',
     path: '/verdant/inscricoes',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedVerdantListasRoute =
+  AuthenticatedVerdantListasRouteImport.update({
+    id: '/verdant/listas',
+    path: '/verdant/listas',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedVerdantRespostasRoute =
+  AuthenticatedVerdantRespostasRouteImport.update({
+    id: '/verdant/respostas',
+    path: '/verdant/respostas',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const ClerkauthSignInRoute = ClerkauthSignInRouteImport.update({
@@ -321,6 +341,7 @@ export interface FileRoutesByFullPath {
   '/verdant/djs': typeof AuthenticatedVerdantDjsRoute
   '/verdant/escalas': typeof AuthenticatedVerdantEscalasRoute
   '/verdant/exportacoes': typeof AuthenticatedVerdantExportacoesRoute
+  '/verdant/financeiro': typeof AuthenticatedVerdantFinanceiroRoute
   '/verdant/formularios': typeof AuthenticatedVerdantFormulariosRoute
   '/verdant/influencers': typeof AuthenticatedVerdantInfluencersRoute
   '/verdant/inscricoes': typeof AuthenticatedVerdantInscricoesRoute
@@ -365,6 +386,7 @@ export interface FileRoutesByTo {
   '/verdant/djs': typeof AuthenticatedVerdantDjsRoute
   '/verdant/escalas': typeof AuthenticatedVerdantEscalasRoute
   '/verdant/exportacoes': typeof AuthenticatedVerdantExportacoesRoute
+  '/verdant/financeiro': typeof AuthenticatedVerdantFinanceiroRoute
   '/verdant/formularios': typeof AuthenticatedVerdantFormulariosRoute
   '/verdant/influencers': typeof AuthenticatedVerdantInfluencersRoute
   '/verdant/inscricoes': typeof AuthenticatedVerdantInscricoesRoute
@@ -414,6 +436,7 @@ export interface FileRoutesById {
   '/_authenticated/verdant/djs': typeof AuthenticatedVerdantDjsRoute
   '/_authenticated/verdant/escalas': typeof AuthenticatedVerdantEscalasRoute
   '/_authenticated/verdant/exportacoes': typeof AuthenticatedVerdantExportacoesRoute
+  '/_authenticated/verdant/financeiro': typeof AuthenticatedVerdantFinanceiroRoute
   '/_authenticated/verdant/formularios': typeof AuthenticatedVerdantFormulariosRoute
   '/_authenticated/verdant/influencers': typeof AuthenticatedVerdantInfluencersRoute
   '/_authenticated/verdant/inscricoes': typeof AuthenticatedVerdantInscricoesRoute
@@ -461,6 +484,7 @@ export interface FileRouteTypes {
     | '/verdant/djs'
     | '/verdant/escalas'
     | '/verdant/exportacoes'
+    | '/verdant/financeiro'
     | '/verdant/formularios'
     | '/verdant/influencers'
     | '/verdant/inscricoes'
@@ -505,6 +529,7 @@ export interface FileRouteTypes {
     | '/verdant/djs'
     | '/verdant/escalas'
     | '/verdant/exportacoes'
+    | '/verdant/financeiro'
     | '/verdant/formularios'
     | '/verdant/influencers'
     | '/verdant/inscricoes'
@@ -553,6 +578,7 @@ export interface FileRouteTypes {
     | '/_authenticated/verdant/djs'
     | '/_authenticated/verdant/escalas'
     | '/_authenticated/verdant/exportacoes'
+    | '/_authenticated/verdant/financeiro'
     | '/_authenticated/verdant/formularios'
     | '/_authenticated/verdant/influencers'
     | '/_authenticated/verdant/inscricoes'
@@ -856,6 +882,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedVerdantExportacoesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/verdant/financeiro': {
+      id: '/_authenticated/verdant/financeiro'
+      path: '/verdant/financeiro'
+      fullPath: '/verdant/financeiro'
+      preLoaderRoute: typeof AuthenticatedVerdantFinanceiroRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/verdant/formularios': {
       id: '/_authenticated/verdant/formularios'
       path: '/verdant/formularios'
@@ -949,6 +982,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedVerdantDjsRoute: typeof AuthenticatedVerdantDjsRoute
   AuthenticatedVerdantEscalasRoute: typeof AuthenticatedVerdantEscalasRoute
   AuthenticatedVerdantExportacoesRoute: typeof AuthenticatedVerdantExportacoesRoute
+  AuthenticatedVerdantFinanceiroRoute: typeof AuthenticatedVerdantFinanceiroRoute
   AuthenticatedVerdantFormulariosRoute: typeof AuthenticatedVerdantFormulariosRoute
   AuthenticatedVerdantInfluencersRoute: typeof AuthenticatedVerdantInfluencersRoute
   AuthenticatedVerdantInscricoesRoute: typeof AuthenticatedVerdantInscricoesRoute
@@ -969,13 +1003,16 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedVerdantCadastrosRoute: AuthenticatedVerdantCadastrosRoute,
   AuthenticatedVerdantConfiguracoesRoute:
     AuthenticatedVerdantConfiguracoesRoute,
-  AuthenticatedVerdantConteudoRoute,
+  AuthenticatedVerdantConteudoRoute: AuthenticatedVerdantConteudoRoute,
   AuthenticatedVerdantDjsRoute: AuthenticatedVerdantDjsRoute,
   AuthenticatedVerdantEscalasRoute: AuthenticatedVerdantEscalasRoute,
   AuthenticatedVerdantExportacoesRoute: AuthenticatedVerdantExportacoesRoute,
+  AuthenticatedVerdantFinanceiroRoute: AuthenticatedVerdantFinanceiroRoute,
   AuthenticatedVerdantFormulariosRoute: AuthenticatedVerdantFormulariosRoute,
   AuthenticatedVerdantInfluencersRoute: AuthenticatedVerdantInfluencersRoute,
   AuthenticatedVerdantInscricoesRoute: AuthenticatedVerdantInscricoesRoute,
+  AuthenticatedVerdantListasRoute: AuthenticatedVerdantListasRoute,
+  AuthenticatedVerdantRespostasRoute: AuthenticatedVerdantRespostasRoute,
   AuthenticatedAppsIndexRoute: AuthenticatedAppsIndexRoute,
   AuthenticatedChatsIndexRoute: AuthenticatedChatsIndexRoute,
   AuthenticatedHelpCenterIndexRoute: AuthenticatedHelpCenterIndexRoute,
