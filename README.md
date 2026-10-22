@@ -110,3 +110,46 @@ Clientes são agrupados para consulta por nome normalizado e contato, preservand
 Candidaturas começam como Novas e podem passar para Em avaliação, Aprovado ou Não selecionado. Apenas administradores avaliam e adicionam candidatos aprovados à equipe. A inclusão aproveita nome, WhatsApp, funções, disponibilidade e experiência, preserva membros já existentes e aceita repetição sem duplicar o cadastro. Pix fica pendente até atualização pelo formulário da equipe. Adicionar uma pessoa à equipe de prestadores não cria acesso ao painel; usuários e permissões continuam em Acessos ao painel.
 
 O backend mantém os históricos de atualizações cadastrais; a central exibe a atualização mais recente por nome e contato. Endpoints `/api/registry/clients`, `/api/registry/candidates` e `/api/registry/team` exigem sessão e as capacidades correspondentes; Pix e inclusão na equipe exigem `team:manage`.
+
+## Financeiro
+
+`/verdant/financeiro` reúne contas a pagar e receber, registro de pagamentos de equipe e DJs, caixa e relatórios CSV. O acesso é exclusivo de administradores, também na API. Se você personalizou o menu antes da implantação, habilite **Financeiro** em **Configurações → Exibição**, ou acesse a rota diretamente.
+
+O módulo usa os eventos, DJs e cadastros da equipe existentes como referências, mas mantém os lançamentos separados das inscrições, saldos importados de clientes e escalas. Ele não altera domínios, links públicos nem a configuração do `connect.verdantcwb.com`. A publicação e a disponibilidade desse domínio continuam dependendo da hospedagem.
+
+### Contas, pagamentos e caixa
+
+- Cadastre receitas como **A receber** e despesas como **A pagar**, com valor em reais e vencimento. Os valores são armazenados em centavos inteiros, sem arredondar valores inválidos.
+- Para pagar equipe ou DJ, escolha a categoria e o profissional já cadastrado; o evento é opcional. A chave Pix disponível no cadastro da equipe é apenas uma referência para o administrador.
+- A baixa registra a data e a forma do pagamento/recebimento. **Não executa Pix, transferência, cobrança ou integração bancária.** Efetue e confira o pagamento fora do painel antes de registrar a baixa.
+- Lançamentos pendentes podem ser editados ou cancelados. Para corrigir uma baixa ou desfazer um cancelamento, reabra o lançamento antes de editar; as operações mantêm histórico com responsável, data e valores anteriores. Não há exclusão definitiva pela interface. Reabrir corrige o registro e retira a baixa dos totais; não registra uma devolução bancária em outra data.
+- O período das contas usa o vencimento; o caixa usa a data da baixa. Cancelados e pendentes não movimentam caixa. O saldo anterior considera as baixas registradas antes do início do período, e o saldo final soma entradas e subtrai saídas. Não é um saldo bancário consultado: importe o histórico necessário ou registre o saldo inicial como uma entrada/saída identificada, sem duplicar o histórico.
+- Relatórios e exportações respeitam os filtros indicados na tela. Valores de entrada, saída e pagamentos de equipe/DJs representam apenas baixas registradas, não pagamentos presumidos a partir das listas ou escalas.
+
+### Importar a planilha existente
+
+Exporte a planilha do Excel ou Google Sheets como **CSV UTF-8**, separado por ponto e vírgula ou vírgula. O módulo não lê `.xlsx` diretamente. Baixe o **modelo CSV** na tela e adapte as colunas da sua planilha antes de importar:
+
+| Coluna | Conteúdo |
+| --- | --- |
+| `id_externo` | Identificador único e estável por lançamento, obrigatório na importação. |
+| `tipo` | `pagar` ou `receber`. |
+| `categoria` | `geral`, `equipe` ou `dj`; vazia significa `geral`. Equipe/DJ exigem conta a pagar. |
+| `descricao` | Descrição obrigatória. |
+| `favorecido` | Fornecedor/cliente, ou nome do profissional cadastrado. |
+| `valor` | Valor positivo em reais, por exemplo `1.234,56` ou `1234.56`. |
+| `vencimento` | Data obrigatória em `DD/MM/AAAA` ou `AAAA-MM-DD`. |
+| `status` | `pendente`, `pago`, `recebido`, `baixado` ou `cancelado`; vazia significa `pendente`. |
+| `data_baixa` | Obrigatória apenas para pagos/recebidos/baixados. |
+| `forma_pagamento` | Para baixados: `dinheiro`, `pix`, `transferencia`, `cartao` ou `outro`. |
+| `evento_id` | Opcional, ID de um evento existente, disponível nas referências da tela. |
+| `beneficiario_id` | ID de equipe/DJ, disponível nas referências. Pode ficar vazio se o nome corresponder a um único profissional da categoria. |
+| `observacoes` | Observações opcionais; textos com separadores ou quebras de linha devem estar entre aspas CSV. |
+
+Cada arquivo aceita até 1.000 lançamentos e 2 MiB. A leitura mostra uma prévia e **não grava nada sem confirmação**. Uma linha inválida impede a gravação do lote inteiro. IDs externos já existentes são ignorados, sem substituir registros: mantenha esses IDs ao exportar novamente a mesma planilha e use a edição de pendentes para corrigir valores. Não reutilize um ID para contas diferentes. A importação não modifica a planilha original e não mantém sincronização automática com ela.
+
+### Persistência e implantação
+
+Em modo JSON, os lançamentos ficam em `storage/finance.json`; `VERDANT_FINANCE_FILE` permite alterar esse caminho. Use volume persistente e uma única instância Node nesse modo. Com MySQL configurado, o módulo usa a chave `finance` da tabela existente `verdant_app_data`. Gravações financeiras usam revisão para rejeitar conflitos (`409`); no MySQL, também usam transação e bloqueio da linha financeira. Dados ilegíveis são preservados, não substituídos por exemplos.
+
+Antes de publicar, faça backup da base e de `storage/`, mantenha a configuração atual de hospedagem/domínios e confira a primeira importação com os totais da planilha. Nenhum dado financeiro de demonstração é criado automaticamente. A compatibilidade das colunas da planilha real precisa ser conferida com um arquivo fornecido por você.

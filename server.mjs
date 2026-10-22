@@ -14,6 +14,7 @@ import { validateTeamRegistration } from './lib/team-registrations.mjs'
 import { validateJobApplication, ROLES as TEAM_ROLES, DAYS as TEAM_DAYS } from './lib/job-applications.mjs'
 import { migrateVerdantState } from './lib/verdant-state-migration.mjs'
 import { PUBLIC_FORM_META, personalizeFormShareHtml } from './lib/public-form-meta.mjs'
+import { emptyFinance, validateFinanceStore, changeFinance } from './lib/finance.mjs'
 
 const root = path.dirname(fileURLToPath(import.meta.url))
 const dist = path.join(root, 'dist')
@@ -32,6 +33,8 @@ let jobApplicationQueue = Promise.resolve()
 const teamRegistrationsPath = process.env.VERDANT_TEAM_REGISTRATIONS_FILE || path.join(root, 'storage', 'team-registrations.json')
 let teamRegistrationQueue = Promise.resolve()
 const operationsPath = process.env.VERDANT_OPERATIONS_FILE || path.join(root,'storage','operations.json')
+const financePath = process.env.VERDANT_FINANCE_FILE || path.join(root, 'storage', 'finance.json')
+let financeQueue = Promise.resolve()
 let operationsQueue = Promise.resolve()
 const port = Number(process.env.PORT || 3000)
 const scrypt = promisify(scryptCallback)
@@ -115,6 +118,7 @@ let mysqlStartupState = mysqlConfigured ? 'starting' : 'json'
 
 function jsonStoreKey(filePath) {
   const resolved = path.resolve(filePath)
+  if (resolved === path.resolve(financePath)) return 'finance'
   if (resolved === path.resolve(operationsPath)) return 'operations'
   if (resolved === path.resolve(dataPath)) return 'verdant_state'
   if (resolved === path.resolve(tasksPath)) return 'tasks'
@@ -498,6 +502,53 @@ async function readOperations() { return readJsonFile(operationsPath,{teamStatus
 async function readRosterTeam() {
   if (mysqlPool) { const [rows] = await mysqlPool.query('SELECT payload FROM verdant_team_registrations ORDER BY created_at DESC, id DESC'); return latestTeam(rows.map(row=>JSON.parse(row.payload))) }
   return latestTeam(await readJsonFile(teamRegistrationsPath,[]))
+}
+async function financeReferences() {
+  const [state, team] = await Promise.all([readState(), readRosterTeam()])
+  return {
+    beneficiaries: [
+      ...team.map(person => ({ id: `team:${person.id}`, name: person.name, kind: 'team', ...(person.pixKey ? { pixKey: person.pixKey } : {}) })),
+      ...(state.people || []).filter(person => person.kind === 'DJ').map(person => ({ id: `dj:${person.id}`, name: person.name, kind: 'dj' })),
+    ],
+    events: state.events.map(event => ({ id: event.id, name: event.name, date: event.date })),
+  }
+}
+
+async function initializeFinanceStore() {
+  if (!mysqlPool) return
+  const [rows] = await mysqlPool.execute('SELECT store_key FROM verdant_app_data WHERE store_key = ?', ['finance'])
+  if (rows.length) return
+  const document = validateFinanceStore(await readJsonFileFromDisk(financePath, emptyFinance()))
+  await mysqlPool.execute('INSERT IGNORE INTO verdant_app_data (store_key, payload) VALUES (?, ?)', ['finance', JSON.stringify(document)])
+}
+
+async function readFinanceStore() {
+  await initializeFinanceStore()
+  return validateFinanceStore(await readJsonFile(financePath, emptyFinance()))
+}
+
+async function mutateFinance(payload, actor, id) {
+  if (mysqlPool) {
+    await initializeFinanceStore()
+    const references = await financeReferences()
+    const connection = await mysqlPool.getConnection()
+    try {
+      await connection.beginTransaction()
+      const [rows] = await connection.execute('SELECT payload FROM verdant_app_data WHERE store_key = ? FOR UPDATE', ['finance'])
+      const result = changeFinance(JSON.parse(rows[0].payload), payload, references, actor, id)
+      await connection.execute('UPDATE verdant_app_data SET payload = ?, updated_at = CURRENT_TIMESTAMP WHERE store_key = ?', [JSON.stringify(result.document), 'finance'])
+      await connection.commit()
+      return result.response
+    } catch (error) { await connection.rollback(); throw error } finally { connection.release() }
+  }
+  const operation = financeQueue.then(async () => {
+    const document = validateFinanceStore(await readJsonFile(financePath, emptyFinance()))
+    const result = changeFinance(document, payload, await financeReferences(), actor, id)
+    await writeJsonFile(financePath, result.document)
+    return result.response
+  })
+  financeQueue = operation.catch(() => {})
+  return operation
 }
 async function changeOperations(change) {
   if (mysqlPool) {
@@ -1418,6 +1469,28 @@ const server = createServer(async (request, response) => {
         : 'Banco de dados indisponível. A aplicação está no ar, mas as operações aguardam a conexão MySQL.'
       return sendJson(response, 503, { error: message, code: 'MYSQL_UNAVAILABLE' })
     }
+    if (url.pathname === '/api/finance' || url.pathname.startsWith('/api/finance/')) {
+      const user = await requireCapability(request, response, 'finance:manage')
+      if (!user) return
+      const origin = request.headers.origin
+      if (request.headers['sec-fetch-site'] === 'cross-site' || (origin && ![
+        `http://${request.headers.host}`, `https://${request.headers.host}`,
+      ].includes(origin))) return sendJson(response, 403, { error: 'Origem não autorizada.' })
+      if (request.method === 'GET' && url.pathname === '/api/finance') {
+        const document = await readFinanceStore()
+        return sendJson(response, 200, { ...document, ...await financeReferences() })
+      }
+      if (request.method === 'POST' && url.pathname === '/api/finance') {
+        const result = await mutateFinance(await bodyJson(request, STATE_BODY_LIMIT_BYTES), user.username)
+        return sendJson(response, 201, result)
+      }
+      const match = url.pathname.match(/^\/api\/finance\/([^/]+)$/)
+      if (request.method === 'PUT' && match) {
+        const result = await mutateFinance(await bodyJson(request), user.username, decodeURIComponent(match[1]))
+        return sendJson(response, 200, result)
+      }
+      return sendJson(response, 405, { error: 'Método financeiro não permitido.' })
+    }
     if (request.method === 'POST' && url.pathname === '/api/auth/login') {
       const payload = await bodyJson(request)
       const username = String(payload.username || payload.email || '').trim().toLowerCase()
@@ -1756,7 +1829,7 @@ const server = createServer(async (request, response) => {
       const user = await requireCapability(request, response, 'preferences:write')
       if (!user) return
       const value = await bodyJson(request)
-      const allowedNavigation = new Set(['/', '/tasks', '/apps', '/chats', '/users', '/verdant/agenda', '/verdant/conteudo', '/verdant/escalas', '/verdant/cadastros', '/verdant/formularios', '/verdant/listas', '/verdant/respostas', '/verdant/inscricoes', '/verdant/djs', '/verdant/influencers', '/verdant/configuracoes', '/help-center', '/settings', '/settings/account', '/settings/appearance', '/settings/notifications', '/settings/display'])
+      const allowedNavigation = new Set(['/', '/tasks', '/apps', '/chats', '/users', '/verdant/agenda', '/verdant/conteudo', '/verdant/escalas', '/verdant/financeiro', '/verdant/cadastros', '/verdant/formularios', '/verdant/listas', '/verdant/respostas', '/verdant/inscricoes', '/verdant/djs', '/verdant/influencers', '/verdant/configuracoes', '/help-center', '/settings', '/settings/account', '/settings/appearance', '/settings/notifications', '/settings/display'])
       const allowedDashboardWidgets = new Set(['registration-count', 'active-events', 'enabled-forms', 'professionals', 'period-chart', 'recent-registrations', 'list-operation'])
       const hasNavigation = Array.isArray(value?.navigation)
       const hasDashboardWidgets = Array.isArray(value?.dashboardWidgets)
@@ -2258,4 +2331,3 @@ initializeMySql().then(async () => {
   mysqlStartupState = 'unavailable'
   console.error('Falha ao inicializar MySQL; o servidor HTTP continuará disponível:', error)
 })
-

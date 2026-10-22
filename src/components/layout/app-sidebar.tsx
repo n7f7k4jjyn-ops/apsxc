@@ -56,7 +56,7 @@ export function AppSidebar() {
         })
         return children.length ? [{ ...item, items: children }] : []
       }
-      return item.url && (String(item.url) !== '/users' || isAdmin) && (String(item.url) !== '/verdant/escalas' || isAdmin) && (String(item.url) !== '/chats' || canChat) ? [item] : []
+      return item.url && (String(item.url) !== '/users' || isAdmin) && (!['/verdant/escalas', '/verdant/financeiro'].includes(String(item.url)) || isAdmin) && (String(item.url) !== '/chats' || canChat) ? [item] : []
     })
     return items.length ? [{ ...group, items }] : []
   })
@@ -94,4 +94,3 @@ export function AppSidebar() {
     </Sidebar>
   )
 }
-
