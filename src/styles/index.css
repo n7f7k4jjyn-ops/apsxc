@@ -1,0 +1,195 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import './theme.css';
+[data-slot='button'].verdant-gradient-button {
+  border: 0;
+  background: linear-gradient(105deg, #299bd7 0%, #7657cf 43%, #c94e9f 100%);
+  color: #fff;
+  box-shadow: 0 7px 22px rgb(155 79 197 / 22%);
+  transition: filter 160ms ease, box-shadow 160ms ease;
+}
+
+[data-slot='button'].verdant-gradient-button:hover:not(:disabled) {
+  filter: brightness(1.08);
+  box-shadow: 0 9px 26px rgb(155 79 197 / 30%);
+}
+
+[data-slot='button'].verdant-gradient-button:disabled {
+  opacity: .55;
+}
+
+
+@custom-variant dark (&:is(.dark *));
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  html {
+    @apply overflow-x-hidden;
+  }
+  body {
+    @apply min-h-svh w-full bg-background text-foreground has-[div[data-variant='inset']]:bg-sidebar;
+  }
+
+  /* Override Radix scroll locking for sticky headers */
+  body[data-scroll-locked] {
+    overflow: unset !important;
+  }
+
+  /* Cursor pointer for buttons */
+  button:not(:disabled),
+  [role='button']:not(:disabled) {
+    cursor: pointer;
+  }
+
+  /* Prevent focus zoom on mobile devices */
+  @media screen and (max-width: 767px) {
+    input,
+    select,
+    textarea {
+      font-size: 16px !important;
+    }
+
+    [data-slot='button'] {
+      min-height: 40px;
+    }
+
+    [data-slot='button'].size-9 {
+      min-width: 40px;
+    }
+
+    header[data-app-header] > div {
+      min-width: 0;
+    }
+
+    header[data-app-header] [data-slot='button'] {
+      min-width: 40px;
+      min-height: 40px;
+    }
+  }
+}
+
+@utility container {
+  margin-inline: auto;
+  padding-inline: 2rem;
+}
+
+@utility no-scrollbar {
+  /* Hide scrollbar for Chrome, Safari and Opera */
+  &::-webkit-scrollbar {
+    display: none;
+  }
+  /* Hide scrollbar for IE, Edge and Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}
+
+@utility faded-bottom {
+  @apply after:pointer-events-none after:absolute after:inset-s-0 after:bottom-0 after:hidden after:h-32 after:w-full after:rounded-b-2xl after:bg-[linear-gradient(180deg,transparent_10%,var(--background)_70%)] md:after:block;
+}
+
+/* styles.css */
+.CollapsibleContent {
+  overflow: hidden;
+}
+.CollapsibleContent[data-state='open'] {
+  animation: slideDown 300ms ease-out;
+}
+.CollapsibleContent[data-state='closed'] {
+  animation: slideUp 300ms ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    height: 0;
+  }
+  to {
+    height: var(--radix-collapsible-content-height);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    height: var(--radix-collapsible-content-height);
+  }
+  to {
+    height: 0;
+  }
+}
+
+
+/* App-wide mobile layout */
+@media screen and (max-width: 767px) {
+  html,
+  body,
+  #root {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  main {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  header[data-app-header] {
+    height: auto;
+    min-height: 56px;
+  }
+
+  header[data-app-header] > div {
+    min-height: 56px;
+    gap: 8px;
+    padding-inline: 10px;
+  }
+
+  header[data-app-header] [data-slot='separator'] {
+    display: none;
+  }
+
+  header[data-app-header] input {
+    min-width: 0;
+  }
+
+  [data-slot='card'] {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  [data-slot='card-content'],
+  [data-slot='card-header'] {
+    min-width: 0;
+  }
+
+  [data-slot='dropdown-menu-content'] {
+    width: min(18rem, calc(100vw - 1rem));
+    max-width: calc(100vw - 1rem);
+  }
+
+  [data-slot='table-container'],
+  .overflow-x-auto {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-inline: contain;
+  }
+
+  form,
+  fieldset {
+    min-width: 0;
+  }
+
+  input,
+  select,
+  textarea {
+    max-width: 100%;
+  }
+
+  h1,
+  h2,
+  h3,
+  p {
+    overflow-wrap: anywhere;
+  }
+}

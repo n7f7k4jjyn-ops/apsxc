@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:server
+      - run: npx vitest run src/features/dashboard/workflow.test.ts src/features/verdant/store.test.ts src/features/verdant/portaria-pdf.test.ts src/features/verdant/professional-door-list.test.ts src/features/verdant/birthday-guests.test.ts src/features/verdant/roster-pdf.test.ts src/features/verdant/meta-pixel.test.ts --browser.enabled=false
+      - run: npm run build
+      - run: node tests/rosters.browser.test.mjs
+      - run: npm run lint
+

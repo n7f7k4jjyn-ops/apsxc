@@ -1,0 +1,52 @@
+/* Keep dashboard cards within the viewport and controls comfortable to tap. */
+.verdant-summary [data-slot='card'] {
+  min-width: 0;
+}
+.verdant-summary [data-slot='card-title'],
+.verdant-summary a {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 639px) {
+  .verdant-summary-header [data-slot='button'] {
+    min-height: 44px;
+  }
+  .verdant-summary-header [aria-keyshortcuts] {
+    width: 44px;
+    min-width: 44px;
+    padding: 0;
+  }
+  .verdant-summary-header [aria-keyshortcuts] > span {
+    display: none;
+  }
+  .verdant-summary-header [aria-keyshortcuts] svg {
+    left: 50%;
+    transform: translate(-50%, -50%);
+  }
+  .verdant-summary [data-slot='button'] {
+    min-height: 44px;
+  }
+  .verdant-summary .summary-refresh {
+    width: 44px;
+    padding: 0;
+  }
+  .verdant-summary [data-slot='card'] {
+    gap: 16px;
+    padding-block: 16px;
+  }
+  .verdant-summary [data-slot='card-header'],
+  .verdant-summary [data-slot='card-content'] {
+    padding-inline: 14px;
+  }
+  .verdant-summary [data-slot='card-title'] {
+    line-height: 1.35;
+  }
+  .verdant-summary .summary-event-actions a {
+    white-space: normal;
+    text-align: center;
+  }
+  .verdant-summary .summary-public-links a {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+  }
+}

@@ -1,0 +1,190 @@
+.rosters {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+.rosters h2 {
+  font-size: 15px;
+  font-weight: 600;
+}
+.rosters label {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  min-width: 0;
+}
+.rosters select,
+.rosters input:not([type='checkbox']),
+.roster-posts {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+  background: var(--background);
+  color: var(--foreground);
+  font: inherit;
+}
+.rosters input:focus-visible,
+.rosters select:focus-visible,
+.roster-posts summary:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.roster-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.roster-toolbar {
+  display: flex;
+  align-items: end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.roster-toolbar > label {
+  flex: 1 1 180px;
+}
+.roster-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.roster-card,
+.roster-entry,
+.roster-team-box {
+  border: 1px solid var(--border);
+  padding: 16px;
+  border-radius: 12px;
+  min-width: 0;
+}
+.roster-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+}
+.roster-card p {
+  font-size: 12px;
+  color: var(--muted-foreground);
+  margin-top: 5px;
+}
+.roster-list,
+.roster-editor {
+  display: grid;
+  gap: 14px;
+}
+.roster-team-box {
+  display: grid;
+  gap: 12px;
+}
+.roster-entries {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.roster-entry-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+}
+.roster-entry > .roster-grid {
+  margin-top: 12px;
+}
+.roster-entry p {
+  overflow-wrap: anywhere;
+}
+.roster-posts {
+  padding: 0;
+}
+.roster-posts summary {
+  padding: 10px;
+  cursor: pointer;
+  font-weight: 400;
+  overflow-wrap: anywhere;
+}
+.roster-posts > div {
+  display: grid;
+  gap: 4px;
+  max-height: 270px;
+  overflow: auto;
+  padding: 6px;
+}
+.roster-posts label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 6px;
+  font-weight: 400;
+}
+.roster-posts input {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  accent-color: #568b2c;
+}
+.roster-footer {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  background: var(--background);
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+}
+.rosters button {
+  min-height: 40px;
+}
+.rosters button:disabled {
+  cursor: not-allowed;
+}
+@media (max-width: 1000px) {
+  .roster-entries {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 600px) {
+  .roster-grid {
+    grid-template-columns: 1fr;
+  }
+  .roster-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .roster-card .roster-actions > * {
+    flex: 1;
+  }
+  .roster-footer > * {
+    flex: 1 1 40%;
+  }
+  .roster-toolbar {
+    align-items: stretch;
+  }
+  .roster-toolbar > label {
+    flex-basis: 100%;
+  }
+  .rosters .verdant-page-heading {
+    align-items: start;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 600px) {
+  .rosters input:not([type='checkbox']),
+  .rosters select {
+    font-size: 16px;
+  }
+}
+
+.roster-post-field {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 500;
+}

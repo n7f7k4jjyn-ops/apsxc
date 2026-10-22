@@ -1,0 +1,24 @@
+{
+  "name": "Verdant Central",
+  "short_name": "Verdant",
+  "description": "Painel interno de gestão da Verdant.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "icons": [
+    {
+      "src": "/images/verdant-heart-favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/images/apple-touch-icon.png?v=3",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

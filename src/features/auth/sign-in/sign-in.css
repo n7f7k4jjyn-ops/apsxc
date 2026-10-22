@@ -1,0 +1,277 @@
+.verdant-login-page {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 16% 20%, rgb(68 151 232 / 16%), transparent 34%),
+    radial-gradient(ellipse at 82% 25%, rgb(206 91 188 / 14%), transparent 32%),
+    radial-gradient(ellipse at 50% 100%, rgb(130 95 216 / 13%), transparent 42%),
+    #10111a;
+  padding-inline: clamp(1rem, 4vw, 2rem) !important;
+}
+
+.verdant-login-page::before,
+.verdant-login-page::after {
+  position: absolute;
+  z-index: -1;
+  width: 18rem;
+  height: 18rem;
+  border-radius: 50%;
+  content: '';
+  filter: blur(90px);
+  opacity: .16;
+  pointer-events: none;
+}
+
+.verdant-login-page::before {
+  top: -12rem;
+  left: -8rem;
+  background: #50b6f2;
+}
+
+.verdant-login-page::after {
+  right: -9rem;
+  bottom: -13rem;
+  background: #ec72c6;
+}
+
+.verdant-login-content {
+  position: relative;
+  z-index: 1;
+}
+
+.verdant-login-brand img {
+  height: 6.25rem;
+  filter: drop-shadow(0 6px 24px rgb(224 117 213 / 12%));
+}
+
+.verdant-login-card {
+  width: min(100%, 56rem);
+  overflow: hidden;
+  border: 0 !important;
+  border-radius: 1.25rem !important;
+  background: rgb(20 22 33 / 34%) !important;
+  color: #f7f6fb !important;
+  box-shadow: 0 24px 70px rgb(0 0 0 / 20%), inset 0 1px rgb(255 255 255 / 5%);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+
+.verdant-login-card [data-slot='card-header'] {
+  gap: .45rem;
+  padding: 1.25rem 1.35rem .25rem;
+}
+
+.verdant-login-card [data-slot='card-title'] {
+  color: #fff;
+}
+
+.verdant-login-card [data-slot='card-description'] {
+  color: rgb(241 239 249 / 68%);
+  line-height: 1.55;
+}
+
+.verdant-login-card [data-slot='card-description'] span {
+  text-wrap: pretty;
+}
+
+.verdant-login-contact {
+  color: rgb(239 190 239 / 90%);
+  text-decoration: none;
+}
+
+.verdant-login-contact:hover {
+  color: #fff;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.verdant-login-contact:focus-visible {
+  border-radius: .15rem;
+  outline: 2px solid rgb(193 126 230 / 80%);
+  outline-offset: 2px;
+}
+
+.verdant-login-card [data-slot='card-content'] {
+  padding: .75rem 1.35rem 1rem;
+}
+
+.verdant-login-card [data-slot='card-footer'] {
+  padding: 0 1.35rem 1.2rem;
+}
+
+.verdant-login-card [data-slot='label'] {
+  color: rgb(250 248 255 / 88%);
+}
+
+.verdant-login-card [data-slot='input'] {
+  border-color: rgb(255 255 255 / 13%);
+  background: rgb(5 7 13 / 30%);
+  color: #fff;
+}
+
+.verdant-login-card [data-slot='input']::placeholder {
+  color: rgb(236 233 244 / 38%);
+}
+
+.verdant-login-card [data-slot='input']:focus-visible {
+  border-color: rgb(193 126 230 / 68%);
+  --tw-ring-color: rgb(193 126 230 / 30%);
+}
+
+.verdant-login-password-label {
+  display: flex;
+  min-height: 1.25rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+  margin-bottom: .5rem;
+}
+
+.verdant-login-password-label span {
+  color: rgb(241 239 249 / 55%);
+  font-size: .68rem;
+  line-height: 1.25;
+  text-align: right;
+}
+
+.verdant-login-remember {
+  display: grid;
+  gap: .35rem;
+  padding: .15rem 0 .25rem;
+}
+
+.verdant-login-remember label {
+  display: flex;
+  align-items: center;
+  gap: .55rem;
+  color: rgb(250 248 255 / 82%);
+  cursor: pointer;
+  font-size: .78rem;
+  line-height: 1.4;
+}
+
+.verdant-login-remember input {
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
+  accent-color: #c94e9f;
+}
+
+.verdant-login-remember input:focus-visible {
+  outline: 2px solid rgb(201 78 159 / 85%);
+  outline-offset: 2px;
+}
+
+.verdant-login-remember p {
+  margin: 0;
+  padding-inline-start: 1.55rem;
+  color: rgb(241 239 249 / 48%);
+  font-size: .68rem;
+  line-height: 1.4;
+}
+
+.verdant-login-button {
+  border: 0;
+  background: linear-gradient(105deg, #299bd7 0%, #7657cf 43%, #c94e9f 100%);
+  color: #fff;
+  box-shadow: 0 7px 22px rgb(155 79 197 / 22%);
+  transition: filter 160ms ease, box-shadow 160ms ease;
+}
+
+.verdant-login-button:hover:not(:disabled) {
+  background: linear-gradient(105deg, #299bd7 0%, #7657cf 43%, #c94e9f 100%);
+  filter: brightness(1.08);
+  box-shadow: 0 9px 26px rgb(155 79 197 / 30%);
+}
+
+.verdant-login-support {
+  margin: .25rem 0 0;
+  padding: .8rem 1rem;
+  border: 0;
+  border-radius: 1rem;
+  background: rgb(255 255 255 / 3%);
+  color: rgb(241 239 249 / 60%);
+  font-size: .75rem;
+  line-height: 1.55;
+  text-align: center;
+}
+
+.verdant-login-support span {
+  color: rgb(239 190 239 / 88%);
+  font-weight: 600;
+}
+
+.verdant-login-footer {
+  display: flex;
+  flex-direction: column;
+  gap: .8rem;
+  align-items: center;
+  text-align: center;
+}
+
+.verdant-login-security {
+  margin: 0;
+  color: rgb(241 239 249 / 42%);
+  font-size: .68rem;
+  line-height: 1.55;
+}
+
+.verdant-login-signature {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .15rem;
+  color: rgb(241 239 249 / 38%);
+  font-size: .61rem;
+  line-height: 1.2;
+}
+
+.verdant-login-signature img {
+  width: 76px;
+  height: 21px;
+  object-fit: contain;
+  opacity: .58;
+}
+
+.verdant-login-signature-link {
+  display: inline-flex;
+  border-radius: .25rem;
+}
+
+.verdant-login-signature-link:focus-visible {
+  outline: 2px solid rgb(193 126 230 / 80%);
+  outline-offset: 3px;
+}
+
+@media (max-width: 380px) {
+  .verdant-login-card [data-slot='card-header'] {
+    padding-inline: 1.1rem;
+  }
+
+  .verdant-login-card [data-slot='card-content'] {
+    padding-inline: 1.1rem;
+  }
+
+  .verdant-login-card [data-slot='card-footer'] {
+    padding-inline: 1.1rem;
+  }
+
+  .verdant-login-password-label span {
+    font-size: .62rem;
+  }
+}
+
+@media (max-height: 700px) {
+  .verdant-login-page {
+    padding-block: .5rem;
+  }
+
+  .verdant-login-brand img {
+    height: 4.5rem;
+  }
+
+  .verdant-login-content {
+    padding-block: .25rem;
+  }
+}
