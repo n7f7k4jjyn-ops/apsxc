@@ -703,7 +703,7 @@ function AdminFinance() {
             Exportar CSV
           </Button>
         </div>
-        {tab === 'summary' ? <ZigEventSummary /> : (
+        {tab === 'summary' ? <ZigEventSummary from={from} to={to} /> : (
         <>
         <div className='finance-grid'>
           <Field id='finance-type-filter' label='Filtrar tipo'>
