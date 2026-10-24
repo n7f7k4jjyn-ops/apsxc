@@ -2,7 +2,7 @@ import { testStaffChanges } from './lib/test-staff.mjs'
 import { validateRoster, teamStatus } from './lib/rosters.mjs'
 import { applicationStatuses, registryIdentity, registryPhone, groupRegistryClients, latestTeam, promotedTeam } from './lib/registry.mjs'
 import { createServer } from 'node:http'
-import { createCipheriv, createHash, randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto'
+import { createCipheriv, createDecipheriv, createHash, randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto'
 import { isIP } from 'node:net'
 import { createReadStream } from 'node:fs'
 import { mkdir, readFile, rename, stat, writeFile } from 'node:fs/promises'
@@ -15,6 +15,8 @@ import { validateJobApplication, ROLES as TEAM_ROLES, DAYS as TEAM_DAYS } from '
 import { migrateVerdantState } from './lib/verdant-state-migration.mjs'
 import { PUBLIC_FORM_META, personalizeFormShareHtml } from './lib/public-form-meta.mjs'
 import { emptyFinance, validateFinanceStore, changeFinance } from './lib/finance.mjs'
+import { ZIG_BASE_URL, ZigError, createZigClient, validateToken as validZigToken } from './lib/zig-client.mjs'
+import { buildZigPreview, listZigEvents, validatePreviewPeriod } from './lib/zig-preview.mjs'
 
 const root = path.dirname(fileURLToPath(import.meta.url))
 const dist = path.join(root, 'dist')
@@ -1124,6 +1126,58 @@ function encryptIntegrationSecret(secret) {
   return { algorithm: 'aes-256-gcm', iv: iv.toString('base64'), tag: cipher.getAuthTag().toString('base64'), ciphertext: ciphertext.toString('base64') }
 }
 
+function decryptIntegrationSecret(payload) {
+  const key = integrationEncryptionKey()
+  if (!key || !payload?.ciphertext) return ''
+  try {
+    const decipher = createDecipheriv('aes-256-gcm', key, Buffer.from(payload.iv, 'base64'))
+    decipher.setAuthTag(Buffer.from(payload.tag, 'base64'))
+    return Buffer.concat([decipher.update(Buffer.from(payload.ciphertext, 'base64')), decipher.final()]).toString('utf8')
+  } catch {
+    const error = new Error('Não foi possível descriptografar o token da Zig. Confira VERDANT_INTEGRATION_ENCRYPTION_KEY ou salve o token novamente.')
+    error.status = 409
+    throw error
+  }
+}
+
+const ZIG_TEST_BASE_URL = process.env.NODE_ENV === 'test' ? String(process.env.VERDANT_ZIG_TEST_BASE_URL || '') : ''
+let zigPreviewRunning = false
+
+function zigSettingsForAdmin(value) {
+  const zig = value?.zig || {}
+  const redeId = String(zig.redeId || '')
+  const lojaId = String(zig.lojaId || '')
+  const tokenConfigured = Boolean(value?.secrets?.zigToken?.ciphertext)
+  const missing = []
+  if (!tokenConfigured) missing.push('token')
+  if (!redeId) missing.push('rede')
+  if (!lojaId) missing.push('loja')
+  let encryptionKeyConfigured = true
+  try { encryptionKeyConfigured = Boolean(integrationEncryptionKey()) } catch { encryptionKeyConfigured = false }
+  return { baseUrl: ZIG_BASE_URL, tokenConfigured, encryptionKeyConfigured, redeId, lojaId, lojaName: String(zig.lojaName || ''), missing }
+}
+
+async function zigContext({ needStore = false } = {}) {
+  const stored = await readJsonFile(integrationsPath, {})
+  const token = decryptIntegrationSecret(stored?.secrets?.zigToken)
+  if (!validZigToken(token)) throw new ZigError('Configure o token de integração da Zig antes de continuar.', { code: 'zig_token_missing', status: 409 })
+  const redeId = String(stored?.zig?.redeId || '')
+  const lojaId = String(stored?.zig?.lojaId || '')
+  if (!redeId) throw new ZigError('Informe o identificador da rede Zig antes de continuar.', { code: 'zig_rede_missing', status: 409 })
+  if (needStore && !lojaId) throw new ZigError('Selecione a loja Verdant antes de continuar.', { code: 'zig_loja_missing', status: 409 })
+  const client = createZigClient({ token, baseUrl: ZIG_TEST_BASE_URL || ZIG_BASE_URL })
+  return { client, redeId, lojaId }
+}
+
+function sendZigError(response, error) {
+  if (error instanceof ZigError || error?.status) {
+    const status = Number.isInteger(error.status) ? error.status : 502
+    return sendJson(response, status, { error: error.message, code: error.code || 'zig_error' })
+  }
+  console.error('Falha inesperada na integração Zig:', error?.name || 'Error')
+  return sendJson(response, 500, { error: 'Falha inesperada na integração Zig.', code: 'zig_error' })
+}
+
 function integrationSettingsForAdmin(value) {
   const secrets = value?.secrets || {}
   return {
@@ -1890,6 +1944,100 @@ const server = createServer(async (request, response) => {
       await writeJsonFile(integrationsPath, settings)
       response.setHeader('Cache-Control', 'no-store')
       return sendJson(response, 200, { settings: integrationSettingsForAdmin(settings) })
+    }
+    if (url.pathname.startsWith('/api/admin/zig/')) {
+      if (!(await requireCapability(request, response, 'zig:manage'))) return
+      response.setHeader('Cache-Control', 'no-store')
+      const route = url.pathname.slice('/api/admin/zig/'.length)
+      try {
+        if (route === 'config' && request.method === 'GET') {
+          return sendJson(response, 200, { settings: zigSettingsForAdmin(await readJsonFile(integrationsPath, {})) })
+        }
+        if (route === 'config' && request.method === 'PUT') {
+          const value = await bodyJson(request)
+          if (!value || typeof value !== 'object' || Array.isArray(value)) return sendJson(response, 400, { error: 'Configuração da Zig inválida.' })
+          const allowed = new Set(['token', 'clearToken', 'redeId', 'lojaId', 'lojaName'])
+          if (Object.keys(value).some((field) => !allowed.has(field))) return sendJson(response, 400, { error: 'A configuração contém campos não reconhecidos.' })
+          const idPattern = /^[A-Za-z0-9_-]{1,64}$/
+          for (const field of ['redeId', 'lojaId']) {
+            if (value[field] !== undefined && (typeof value[field] !== 'string' || (value[field].trim() && !idPattern.test(value[field].trim())))) {
+              return sendJson(response, 400, { error: `O campo ${field} aceita apenas letras, números, hífen e sublinhado (até 64).` })
+            }
+          }
+          if (value.lojaName !== undefined && (typeof value.lojaName !== 'string' || value.lojaName.length > 120)) return sendJson(response, 400, { error: 'O nome da loja deve ter até 120 caracteres.' })
+          if (value.clearToken !== undefined && typeof value.clearToken !== 'boolean') return sendJson(response, 400, { error: 'A opção de remoção do token é inválida.' })
+          if (value.token !== undefined && (typeof value.token !== 'string' || (value.token && !validZigToken(value.token)))) return sendJson(response, 400, { error: 'O token da Zig é inválido (sem espaços, até 2.048 caracteres).' })
+          const current = await readJsonFile(integrationsPath, {})
+          const settings = { ...current, zig: { ...(current.zig || {}) }, secrets: { ...(current.secrets || {}) } }
+          if (value.redeId !== undefined) {
+            const redeId = value.redeId.trim()
+            if (redeId !== String(settings.zig.redeId || '')) { settings.zig.lojaId = ''; settings.zig.lojaName = '' }
+            settings.zig.redeId = redeId
+          }
+          if (value.lojaId !== undefined) {
+            settings.zig.lojaId = value.lojaId.trim()
+            settings.zig.lojaName = settings.zig.lojaId ? String(value.lojaName ?? '').trim() : ''
+          }
+          if (value.clearToken === true) delete settings.secrets.zigToken
+          else if (typeof value.token === 'string' && value.token.trim()) settings.secrets.zigToken = encryptIntegrationSecret(value.token.trim())
+          await writeJsonFile(integrationsPath, settings)
+          return sendJson(response, 200, { settings: zigSettingsForAdmin(settings) })
+        }
+        if (route === 'stores' && request.method === 'GET') {
+          const { client, redeId } = await zigContext()
+          const stores = await client.listStores(redeId)
+          return sendJson(response, 200, { stores: stores.map((store) => ({ id: String(store?.id ?? ''), name: String(store?.name ?? '') })).filter((store) => store.id) })
+        }
+        if (route === 'test' && request.method === 'POST') {
+          const { client, redeId, lojaId } = await zigContext()
+          const stores = await client.listStores(redeId)
+          const selected = lojaId ? stores.find((store) => String(store?.id) === lojaId) : null
+          return sendJson(response, 200, {
+            ok: true,
+            storeCount: stores.length,
+            storeSelected: Boolean(lojaId),
+            storeFound: lojaId ? Boolean(selected) : null,
+            storeName: selected ? String(selected.name ?? '') : '',
+            message: !lojaId
+              ? 'Conexão válida. Selecione a loja Verdant para continuar.'
+              : selected ? 'Conexão válida e loja encontrada.' : 'Conexão válida, mas a loja salva não aparece nesta rede. Selecione a loja novamente.',
+          })
+        }
+        if (route === 'events' && request.method === 'GET') {
+          const { client, lojaId } = await zigContext({ needStore: true })
+          const dtinicio = String(url.searchParams.get('dtinicio') || '')
+          const dtfim = String(url.searchParams.get('dtfim') || '')
+          const invalid = validatePreviewPeriod(dtinicio, dtfim)
+          if (invalid) return sendJson(response, 400, { error: invalid })
+          const events = await listZigEvents(client, lojaId, dtinicio, dtfim)
+          return sendJson(response, 200, { events: events.map(({ id, name, beginAt, peopleCapacity }) => ({ id, name, beginAt, peopleCapacity })) })
+        }
+        if (route === 'preview' && request.method === 'POST') {
+          const value = await bodyJson(request)
+          const dtinicio = String(value?.dtinicio || '')
+          const dtfim = String(value?.dtfim || '')
+          const invalid = validatePreviewPeriod(dtinicio, dtfim)
+          if (invalid) return sendJson(response, 400, { error: invalid })
+          const { client, lojaId } = await zigContext({ needStore: true })
+          if (zigPreviewRunning) return sendJson(response, 409, { error: 'Já existe uma prévia da Zig em andamento. Aguarde a conclusão.' })
+          zigPreviewRunning = true
+          try {
+            const customers = await readJsonFile(customersPath, [])
+            const state = await readState()
+            const preview = await buildZigPreview({
+              client, lojaId, dtinicio, dtfim,
+              customers: Array.isArray(customers) ? customers : [],
+              registrations: Array.isArray(state?.registrations) ? state.registrations : [],
+            })
+            return sendJson(response, 200, { preview })
+          } finally {
+            zigPreviewRunning = false
+          }
+        }
+      } catch (error) {
+        return sendZigError(response, error)
+      }
+      return sendJson(response, 404, { error: 'Rota não encontrada.' })
     }
     if (url.pathname === '/api/public/meta-pixel' && request.method === 'GET') {
       const pixelId = String((await readJsonFile(integrationsPath, {}))?.metaPixelId || '')
