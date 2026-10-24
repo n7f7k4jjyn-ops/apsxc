@@ -398,6 +398,20 @@ function AdminFinance() {
       if (active.current) setBusy(false)
     }
   }
+  function applyPreset(kind: 'day' | 'week' | 'month' | 'all') {
+    const now = new Date()
+    const key = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+    if (kind === 'all') { setFrom(''); setTo(''); return }
+    if (kind === 'day') { setFrom(key(now)); setTo(key(now)); return }
+    if (kind === 'month') {
+      setFrom(key(new Date(now.getFullYear(), now.getMonth(), 1)))
+      setTo(key(new Date(now.getFullYear(), now.getMonth() + 1, 0)))
+      return
+    }
+    const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - ((now.getDay() + 6) % 7))
+    setFrom(key(monday))
+    setTo(key(new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6)))
+  }
   async function bulkLink() {
     if (disabled || lock.current || !data || !selectedIds.size) return
     if (!window.confirm(`Vincular ${selectedIds.size} lançamento(s) a ${bulkEvent ? 'este evento' : 'nenhum evento'}? Nenhum valor é alterado; o histórico registra a mudança.`)) return
@@ -641,6 +655,20 @@ function AdminFinance() {
       )}
       <Card className='finance-panel'>
         <h2>Período e evento</h2>
+        <div className='finance-actions'>
+          {(
+            [
+              ['day', 'Hoje'],
+              ['week', 'Esta semana'],
+              ['month', 'Este mês'],
+              ['all', 'Todo o período'],
+            ] as const
+          ).map(([key, label]) => (
+            <Button key={key} type='button' size='sm' variant='outline' onClick={() => applyPreset(key)}>
+              {label}
+            </Button>
+          ))}
+        </div>
         <div className='finance-grid'>
           <Field id='finance-from' label='Data inicial'>
             <Input
