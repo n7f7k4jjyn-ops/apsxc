@@ -185,7 +185,7 @@ export function Apps() {
       </Header>
 
       {/* ===== Content ===== */}
-      <Main fixed>
+      <Main className='flex flex-col'>
         <div>
           <h1 className='text-2xl font-bold tracking-tight'>{<LocalizedText text="Integrações de apps" leadingSpace trailingSpace />}</h1>
           <p className='text-muted-foreground'>{<LocalizedText text="Catálogo de serviços. A conexão OAuth/API ainda precisa ser configurada para cada serviço." leadingSpace trailingSpace />}</p>
