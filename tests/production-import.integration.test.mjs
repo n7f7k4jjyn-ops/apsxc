@@ -110,6 +110,7 @@ test('production import through authenticated APIs: backup, partial recovery, li
       await columnFilters.getByRole('button', { name: 'Limpar', exact: true }).click()
       assert.equal(await ledgerTable.locator('tbody tr').count(), plan.entries.length + 2)
       await page.getByRole('navigation', { name: 'Navegação rápida do aplicativo' }).getByRole('link', { name: 'Resumo', exact: true }).click()
+      await page.getByRole('heading', { name: 'Resumo da operação', exact: true }).waitFor()
       await page.getByRole('button', { name: 'Resumo financeiro', exact: true }).click()
       await page.getByRole('heading', { name: 'Comparação entre períodos' }).waitFor()
       await page.getByLabel('Data inicial', { exact: true }).fill('2024-01-01')
