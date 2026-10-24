@@ -10,7 +10,7 @@ import { DjLineEditor } from './dj-line-editor'
 import type { PortariaSection } from './portaria-pdf'
 import { RegistryPage } from './registry'
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
-import { Link, useNavigate } from '@tanstack/react-router'
+import { Link, useNavigate, useBlocker } from '@tanstack/react-router'
 import {
   Archive,
   AlertTriangle,
@@ -105,7 +105,7 @@ const sectionInfo: Record<Section, { title: string; description: string }> = {
   clientes: { title: 'Clientes', description: 'Consulte as inscrições dos formulários e importe a base histórica de clientes para cruzamentos futuros.' },
   djs: { title: 'Cadastro de DJs', description: 'Mantenha o cadastro geral e escolha, em cada evento, quem aparece na lista.' },
   influencers: { title: 'Cadastro de Influencers', description: 'Mantenha o cadastro geral e vincule cada pessoa às datas em que participará.' },
-  exportacoes: { title: 'Relatórios', description: 'Prepare a lista de portaria, leads e relatórios de profissionais.' },
+  exportacoes: { title: 'Relatórios', description: 'Selecione o evento, confira os totais e gere os arquivos da operação.' },
   configuracoes: { title: 'Configurações', description: 'Ajuste a operação dos formulários e confira a sincronização.' },
 }
 
@@ -246,6 +246,13 @@ export function DashboardVerdantShortcut() {
 function AgendaPage({ data, update }: { data: VerdantState; update: (mutate: (state: VerdantState) => VerdantState) => Promise<boolean> }) {
   const { language, translate } = useLanguage()
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [dirty, setDirty] = useState(false)
+  const confirmDiscard = useCallback(() => {
+    return !dirty || window.confirm(language === 'en'
+      ? 'Discard unsaved event changes?'
+      : 'Descartar as alterações não salvas deste evento?')
+  }, [dirty, language])
+  useBlocker({ shouldBlockFn: () => !confirmDiscard(), enableBeforeUnload: dirty })
   const [newDate, setNewDate] = useState('')
   const [selectedCalendarDate, setSelectedCalendarDate] = useState(() => isoDate(new Date()))
   const [calendarMonth, setCalendarMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1))
@@ -293,15 +300,19 @@ function AgendaPage({ data, update }: { data: VerdantState; update: (mutate: (st
     const closeOnEscape = (event: KeyboardEvent) => {
       const pickerOpen = document.querySelector('.verdant-professional-popover[data-state="open"]')
       if (event.key === 'Escape' && !pickerOpen) {
+        if (!confirmDiscard()) return
+        setDirty(false)
         setSelectedId(null)
         setNewDate('')
       }
     }
     document.addEventListener('keydown', closeOnEscape, true)
     return () => document.removeEventListener('keydown', closeOnEscape, true)
-  }, [draftDate, isMobile, selected])
+  }, [draftDate, isMobile, selected, confirmDiscard])
 
   function startNewEvent(date: string) {
+    if (!confirmDiscard()) return
+    setDirty(false)
     setNotice('')
     setSelectedId(null)
     setNewDate(date)
@@ -418,6 +429,7 @@ function AgendaPage({ data, update }: { data: VerdantState; update: (mutate: (st
       }))
     }
     if (!saved) return
+    setDirty(false)
     if (item) {
       setSelectedId(item.id)
       setSelectedEventProfessionalIds(draftProfessionalIds)
@@ -461,6 +473,8 @@ function AgendaPage({ data, update }: { data: VerdantState; update: (mutate: (st
   }
 
   function closeEventEditor() {
+    if (!confirmDiscard()) return
+    setDirty(false)
     setSelectedId(null)
     setNewDate('')
   }
@@ -514,6 +528,8 @@ function AgendaPage({ data, update }: { data: VerdantState; update: (mutate: (st
                 const opened = data.forms.filter((form) => form.eventId === event.id && isOpen(data, form.key, event.id)).length
     const count = visibleRegistrations(data).filter((row) => row.eventId === event.id).length
                 return <button type='button' className='verdant-calendar-event' key={event.id} onClick={() => {
+                  if (event.id === selectedId || !confirmDiscard()) return
+                  setDirty(false)
                   setSelectedCalendarDate(event.date)
                   setSelectedId(event.id)
                   setSelectedEventProfessionalIds(data.people.filter((person) => person.eventIds.includes(event.id)).map((person) => person.id))
@@ -550,7 +566,7 @@ function AgendaPage({ data, update }: { data: VerdantState; update: (mutate: (st
           <CardContent>
             <EventWorkflowNav event={selected} />
             {selected || draftDate ? (
-              <form className='verdant-form-stack' onSubmit={saveEvent} onChange={() => setNotice('')} key={selected?.id ?? 'new'}>
+              <form className='verdant-form-stack' onSubmit={saveEvent} onChange={() => { setNotice(''); setDirty(true) }} key={selected?.id ?? 'new'}>
                 <label className='verdant-field'>{<LocalizedText text={"Nome do evento"} />}<input name='name' required maxLength={120} defaultValue={selected?.name ?? ''} placeholder='Nome da festa' /></label>
                 <label className='verdant-field'>{<LocalizedText text={"Data"} />}<input name='date' type='date' required value={draftDate} onChange={(event) => !selected && changeNewEventDate(event.target.value)} /></label>
                 <label className='verdant-field'>{<LocalizedText text={"Horário do evento"} />}<input name='eventTime' type='time' defaultValue={selected?.eventTime ?? ''} /></label>
@@ -569,7 +585,7 @@ function AgendaPage({ data, update }: { data: VerdantState; update: (mutate: (st
                   <EventPeopleSelector
                     people={data.people}
                     selectedIds={selectedEventProfessionalIds}
-                    onChange={setSelectedEventProfessionalIds}
+                    onChange={(ids) => { setSelectedEventProfessionalIds(ids); setDirty(true) }}
                   />
                 </> : <section className='verdant-event-form-configs'>
                   <div className='verdant-event-form-configs-heading'><div><h3>{<LocalizedText text={"Configuração das listas deste evento"} />}</h3><p>{<LocalizedText text={"Todas as regras e vínculos serão gravados junto com o evento."} />}</p></div><span>{<LocalizedText text={"5 formulários"} />}</span></div>
@@ -1884,26 +1900,30 @@ export function VerdantReports({ data, embedded = false }: { data: VerdantState;
       {embedded ? <div className='verdant-page-heading'><div><div className='verdant-eyebrow'>{<LocalizedText text={"CENTRAL VERDANT"} />}</div><h2>{<LocalizedText text={"Relatórios"} />}</h2><p>{<LocalizedText text={"Imprima ou salve em PDF, ou exporte os dados em CSV."} />}</p></div></div> : <SectionHeading section='exportacoes' />}
       {!embedded && <EventWorkflowNav event={event} />}
       <Card className='mb-4'><CardHeader><CardTitle>{<LocalizedText text={"Evento e timbrado"} />}</CardTitle><CardDescription>{<LocalizedText text={"Selecione uma data. A escolha aplica-se a todos os relatórios abaixo e fica salva no evento."} />}</CardDescription></CardHeader><CardContent className='grid gap-3 sm:grid-cols-2'><label className='verdant-field'>{<LocalizedText text={"Evento"} />}<select aria-label={translate('Evento dos relatórios')} value={eventId} onChange={(e) => setEventId(e.target.value)}><option value=''>{<LocalizedText text={"Selecione um evento"} />}</option>{data.events.filter((item) => item.active).sort((a, b) => a.date.localeCompare(b.date)).map((item) => <option key={item.id} value={item.id}>{compactDate(item.date)} · {item.name}</option>)}</select></label>{event && <label className='verdant-field'>{<LocalizedText text={"Timbrado deste evento"} />}<select value={event.letterheadId ?? ''} onChange={(e) => saveLetterhead(e.target.value)}>{letterheadOptions.map((item) => <option key={item.id || 'none'} value={item.id}>{item.label}</option>)}</select></label>}</CardContent></Card>
-      {event && <DjLineEditor key={`${eventId}-${data.revision}`} data={data} eventId={eventId} update={update} />}
-      <details className='mb-4 rounded-lg border p-4'><summary className='cursor-pointer font-semibold'>Histórico e PDFs de escalas</summary><div className='mt-4'><RostersPage data={data} historyOnly /></div></details>
+      {!event && <p className='mb-4 text-sm text-muted-foreground' role='status'>Selecione um evento para liberar os relatórios da noite. A lista geral reúne todos os eventos ativos.</p>}
+      <div className='mb-3'><h3 className='font-semibold'>1. Emitir relatórios</h3><p className='text-sm text-muted-foreground'>Portaria, contatos e profissionais. Os arquivos usam o evento selecionado acima; a lista geral considera todos os eventos ativos.</p></div>
       <div className='verdant-export-grid'>
-        <Card className='verdant-export-card'><CardHeader><div className='verdant-export-icon'><Printer size={18} /></div><CardTitle>{<LocalizedText text={"Lista de portaria"} />}</CardTitle><CardDescription>{<LocalizedText text={"Nomes inscritos no evento, organizados por lista e profissional."} />}</CardDescription></CardHeader><CardContent><div className='verdant-export-count'>{doorCsvRows.length}<small>{<LocalizedText text={"nomes na lista"} />}</small></div><div className='verdant-export-actions'><Button className='verdant-report-primary' onClick={() => { void downloadReportPdf() }} disabled={!event || pdfBusy}><Printer size={15} />{<LocalizedText text={pdfBusy ? "Gerando PDF…" : "Gerar PDF"} leadingSpace />}</Button><Button variant='outline' onClick={() => csvDownload(`verdant-portaria-${event?.date ?? 'evento'}.csv`, [['Lista', 'Profissional / categoria', 'Nome'], ...doorCsvRows])} disabled={!event}><ArrowDownToLine size={15} />{<LocalizedText text={"Exportar CSV"} leadingSpace />}</Button></div></CardContent></Card>
+        <ReportExportCard icon={<Printer size={18} />} title='Lista de portaria' description='Nomes inscritos no evento, organizados por lista e profissional.' count={doorCsvRows.length} countLabel='nomes na lista' onPrint={() => { void downloadReportPdf() }} onCsv={() => csvDownload(`verdant-portaria-${event?.date ?? 'evento'}.csv`, [['Lista', 'Profissional / categoria', 'Nome'], ...doorCsvRows])} disabled={!event || pdfBusy} />
         <ReportExportCard icon={<FileSpreadsheet size={18} />} title='Lista geral (todos os eventos)' description='Todas as inscrições de todos os eventos ativos, em um único CSV.' count={visibleRegistrations(data).length} countLabel='inscrições'         onPrint={() => { void downloadReportPdf('geral') }} disabled={pdfBusy} onCsv={exportGeneral} />
         <ReportExportCard icon={<FileSpreadsheet size={18} />} title='Leads com consentimento' description='Contatos que aceitaram novidades: nome, WhatsApp e e-mail.' count={leads.length} countLabel='contatos autorizados' onPrint={() => { void downloadReportPdf('leads') }} onCsv={exportLeads} disabled={!event || pdfBusy} />
         <ReportExportCard icon={<Music2 size={18} />} title='Lista de DJs' description='Inscritos agrupados pelo DJ, também incluídos no relatório geral. PDF e CSV de convidados.' count={djGuests(data, eventId).length} countLabel='inscritos vinculados aos DJs' onPrint={() => { void downloadReportPdf('djs') }} onCsv={() => exportPeople('DJ')} disabled={!event || pdfBusy} />
-        <Card className='verdant-export-card'><CardHeader><CardTitle>Line de DJs</CardTitle><CardDescription>Escala da noite por pista, com ordem e horários. Os inscritos ficam na Lista de DJs e no relatório geral.</CardDescription></CardHeader><CardContent><label className='verdant-field'>Pista<select value={lineTrack} onChange={e=>setLineTrack(e.target.value)}><option value=''>Todas as pistas</option><option>SKY</option><option>LAND</option></select></label><label className='verdant-field'>Organizar impressão<select value={lineSort} onChange={e => setLineSort(e.target.value as 'order' | 'time')}><option value='order'>Ordem 1, 2, 3… por pista</option><option value='time'>Horário da noite por pista</option></select></label><div className='verdant-export-actions'><Button disabled={!event || pdfBusy || !printableLine.length} onClick={() => void downloadReportPdf('line')}>Gerar PDF da line</Button><Button variant='outline' disabled={!event || !printableLine.length} onClick={() => csvDownload(`verdant-line-djs-${event?.date || 'evento'}.csv`, [['Data', 'Evento', 'Pista', 'Ordem', 'DJ', 'Primeiro horário', 'Segundo horário'], ...printableLine.map(row => [event?.date || '', event?.name || '', row.track, String(row.order), row.name, row.time, row.secondTime || ''])])}>Exportar CSV da line</Button></div></CardContent></Card>
+        <ReportExportCard icon={<Music2 size={18} />} title='Line de DJs' description='Escala da noite por pista, com ordem e dois horários por DJ.' count={printableLine.length} countLabel='participações na line' onPrint={() => { void downloadReportPdf('line') }} onCsv={() => csvDownload(`verdant-line-djs-${event?.date || 'evento'}.csv`, [['Data', 'Evento', 'Pista', 'Ordem', 'DJ', 'Primeiro horário', 'Segundo horário'], ...printableLine.map(row => [event?.date || '', event?.name || '', row.track, String(row.order), row.name, row.time, row.secondTime || ''])])} disabled={!event || pdfBusy || !printableLine.length}><label className='verdant-field'>Pista<select value={lineTrack} onChange={e=>setLineTrack(e.target.value)}><option value=''>Todas as pistas</option><option>SKY</option><option>LAND</option></select></label><label className='verdant-field'>Organizar impressão<select value={lineSort} onChange={e => setLineSort(e.target.value as 'order' | 'time')}><option value='order'>Ordem 1, 2, 3… por pista</option><option value='time'>Horário da noite por pista</option></select></label></ReportExportCard>
         <ReportExportCard icon={<Megaphone size={18} />} title='Lista de Influencers' description='PDF com os nomes dos Influencers e seus convidados, agrupados por profissional.' count={influencerRows.length} countLabel='Influencers vinculados' onPrint={() => { void downloadReportPdf('influencers') }} onCsv={() => exportPeople('INFLUENCIADORES')} disabled={!event || pdfBusy} />
       </div>
-      {admin && <InfluencerPayoutReportPanel eventId={eventId || undefined} />}
-      {pdfDownload?.eventId === eventId && <a className='mt-3 inline-flex min-h-11 items-center text-sm underline' href={pdfDownload.url} download={pdfDownload.filename}>Baixar PDF — {pdfDownload.label}</a>}
+      {pdfDownload?.eventId === eventId && <a className='my-3 inline-flex min-h-11 items-center text-sm underline' href={pdfDownload.url} download={pdfDownload.filename}>Baixar PDF — {pdfDownload.label}</a>}
+      <div className='mt-6 mb-3'><h3 className='font-semibold'>2. Conferir e organizar</h3><p className='text-sm text-muted-foreground'>Ajuste a line, consulte as escalas e confira os repasses antes de encerrar o trabalho.</p></div>
+      {event && <DjLineEditor key={`${eventId}-${data.revision}`} data={data} eventId={eventId} update={update} />}
+      <details className='mb-4 rounded-lg border p-4'><summary className='cursor-pointer font-semibold'>Histórico e PDFs de escalas</summary><div className='mt-4'><RostersPage data={data} historyOnly /></div></details>
+      {admin && <details className='rounded-lg border p-4'><summary className='cursor-pointer font-semibold'>Repasses de influencers — conferência e exportação</summary><div className='mt-4'><InfluencerPayoutReportPanel key={eventId} eventId={eventId || undefined} /></div></details>}
+
 
     </>
   )
 }
 
-function ReportExportCard({ icon, title, description, count, countLabel, onPrint, onCsv, disabled = false }: { icon: React.ReactNode; title: string; description: string; count: number; countLabel: string; onPrint: () => void; onCsv: () => void; disabled?: boolean }) {
+function ReportExportCard({ icon, title, description, count, countLabel, onPrint, onCsv, children, disabled = false }: { children?: React.ReactNode; icon: React.ReactNode; title: string; description: string; count: number; countLabel: string; onPrint: () => void; onCsv: () => void; disabled?: boolean }) {
   const { translate } = useLanguage()
-  return <Card className='verdant-export-card'><CardHeader><div className='verdant-export-icon'>{icon}</div><CardTitle>{translate(title)}</CardTitle><CardDescription>{translate(description)}</CardDescription></CardHeader><CardContent><div className='verdant-export-count'>{count}<small>{translate(countLabel)}</small></div><div className='verdant-export-actions'><Button className='verdant-report-primary' onClick={onPrint} disabled={disabled}><Printer size={15} />{<LocalizedText text={"Gerar PDF"} leadingSpace />}</Button><Button variant='outline' onClick={onCsv} disabled={disabled}><ArrowDownToLine size={15} />{<LocalizedText text={"Exportar CSV"} leadingSpace />}</Button></div></CardContent></Card>
+  return <Card className='verdant-export-card'><CardHeader><div className='verdant-export-icon'>{icon}</div><CardTitle>{translate(title)}</CardTitle><CardDescription>{translate(description)}</CardDescription></CardHeader><CardContent><div className='verdant-export-count'>{count}<small>{translate(countLabel)}</small></div>{children && <div className='verdant-export-options'>{children}</div>}<div className='verdant-export-actions'><Button className='verdant-report-primary' onClick={onPrint} disabled={disabled}><Printer size={15} />{<LocalizedText text={"Gerar PDF"} leadingSpace />}</Button><Button variant='outline' onClick={onCsv} disabled={disabled}><ArrowDownToLine size={15} />{<LocalizedText text={"Exportar CSV"} leadingSpace />}</Button></div></CardContent></Card>
 }
 
 function ExportsPage({ data }: { data: VerdantState }) {

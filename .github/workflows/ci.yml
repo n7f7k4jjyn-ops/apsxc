@@ -23,8 +23,10 @@ jobs:
       - run: npm run test:server
       - run: npm run test:production-import
       - run: npx vitest run src/features/dashboard/workflow.test.ts src/features/verdant/store.test.ts src/features/verdant/data.test.ts src/features/verdant/portaria-pdf.test.ts src/features/verdant/professional-door-list.test.ts src/features/verdant/birthday-guests.test.ts src/features/verdant/roster-pdf.test.ts src/features/verdant/meta-pixel.test.ts --browser.enabled=false
+      - run: npm test -- src/components/layout/page-context.test.tsx src/components/layout/mobile-navigation.test.tsx src/features/verdant/event-workflow.test.tsx
       - run: npm run build
       - run: node tests/rosters.browser.test.mjs
+      - run: node --test tests/navigation.browser.test.mjs
       - run: node --test tests/production-import.integration.test.mjs
         env:
           PRODUCTION_IMPORT_BROWSER: '1'

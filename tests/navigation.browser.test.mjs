@@ -135,7 +135,20 @@ test('event workflow and touch navigation across desktop, tablet and mobile', { 
     await page.getByRole('combobox', { name: 'Ir para página' }).selectOption('/verdant/agenda')
     await page.getByRole('gridcell', { name: /^9, / }).click()
     await page.getByRole('button', { name: new RegExp(event.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) }).click()
-    await page.getByRole('dialog', { name: 'Editar evento' }).getByRole('link', { name: 'Listas', exact: true }).click()
+    const editor = page.getByRole('dialog', { name: 'Editar evento' })
+    await editor.getByLabel('Nome do evento', { exact: true }).fill('Rascunho não salvo')
+    const rejected = page.waitForEvent('dialog')
+    const firstClick = editor.getByRole('link', { name: 'Listas', exact: true }).click()
+    const prompt = await rejected
+    assert.equal(prompt.type(), 'confirm')
+    await prompt.dismiss()
+    await firstClick
+    await expect(page).toHaveURL(`${base}/verdant/agenda`)
+    await expect(editor.getByLabel('Nome do evento', { exact: true })).toHaveValue('Rascunho não salvo')
+    const accepted = page.waitForEvent('dialog')
+    const secondClick = editor.getByRole('link', { name: 'Listas', exact: true }).click()
+    await (await accepted).accept()
+    await secondClick
     await expect(page).toHaveURL(`${base}/verdant/listas?event=${event.id}`)
     await expect.poll(() => page.evaluate(() => document.body.style.overflow)).not.toBe('hidden')
     await page.goto(`${base}/verdant/djs`)
