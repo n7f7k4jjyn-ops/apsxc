@@ -105,6 +105,28 @@ test('event workflow and touch navigation across desktop, tablet and mobile', { 
     await expect(page).toHaveURL(`${base}/verdant/exportacoes?event=${event.id}`)
     await expect(page.getByRole('combobox', { name: 'Evento dos relatórios', exact: true })).toHaveValue(event.id)
 
+    assert.equal(await page.locator('.verdant-export-card').count(), 6)
+    await page.getByRole('button', { name: 'Abrir DJs', exact: true }).click()
+    const djDialog = page.getByRole('dialog', { name: 'DJs', exact: true })
+    await expect(djDialog.getByText('Convidados dos DJs', { exact: true })).toBeVisible()
+    await expect(djDialog.getByText('Organizar line — pistas e horários', { exact: true })).toBeVisible()
+    await expect(djDialog.getByRole('button', { name: 'Gerar PDF de convidados', exact: true })).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(djDialog).toBeHidden()
+    await expect(page.getByRole('button', { name: 'Abrir DJs', exact: true })).toBeFocused()
+    for (const width of [390, 1280]) {
+      await page.setViewportSize({ width, height: 900 })
+      for (const title of ['Lista de portaria', 'Lista geral (todos os eventos)', 'Leads com consentimento', 'DJs', 'Influencers', 'Escalas da equipe']) {
+        await page.getByRole('button', { name: `Abrir ${title}`, exact: true }).click()
+        const reportDialog = page.getByRole('dialog', { name: title, exact: true })
+        await expect(reportDialog).toBeVisible()
+        const box = await reportDialog.boundingBox()
+        assert.ok(box.x >= -1 && box.x + box.width <= width + 1, `${title} dialog must fit viewport`)
+        await reportDialog.getByRole('button', { name: 'Fechar', exact: true }).click()
+        await expect(reportDialog).toBeHidden()
+      }
+    }
+
     for (const width of [320, 375, 430, 768, 1280]) {
       await page.setViewportSize({ width, height: 900 })
       for (const route of ['agenda', 'listas', 'inscricoes', 'exportacoes']) {

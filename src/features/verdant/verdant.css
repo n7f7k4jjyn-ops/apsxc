@@ -548,3 +548,9 @@
 .verdant-export-card [data-slot=card-content] { justify-content: flex-start; gap: 12px; }
 .verdant-export-options { display: grid; gap: 10px; }
 .verdant-export-actions > button { flex: 1 1 110px; min-height: 40px; white-space: normal; }
+
+.verdant-export-card [data-slot=card-header] { min-height: 110px; }
+.verdant-report-dialog { min-width: 0; }
+.verdant-report-dialog > * { min-width: 0; }
+.verdant-report-dialog .verdant-export-actions { margin-top: 0; }
+.verdant-report-dialog .verdant-export-actions > button { min-height: 44px; }
