@@ -1,9 +1,9 @@
+import '@/styles/index.css'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
 import { page, userEvent } from 'vitest/browser'
 import { AppQuickNav } from './app-quick-nav'
 import { PageContext } from './page-context'
-import '@/styles/index.css'
 
 const navigate = vi.fn()
 
@@ -73,12 +73,15 @@ describe('page navigation context', () => {
       .not.toHaveAttribute('aria-current')
   })
 
-  it('offers a touch-sized mobile selector with the current parent section', async () => {
+  it('offers a touch-sized mobile selector and allows returning to the parent section', async () => {
     await page.viewport(320, 700)
     try {
       const screen = await render(<AppQuickNav />)
       const select = screen.getByRole('combobox', { name: 'Ir para página' })
-      await expect.element(select).toHaveValue('/verdant/cadastros')
+      await expect.element(select).toHaveValue('')
+      await expect
+        .element(screen.getByRole('option', { name: 'DJs', exact: true }))
+        .toBeDisabled()
       expect(
         select.element().getBoundingClientRect().height
       ).toBeGreaterThanOrEqual(44)
@@ -88,8 +91,8 @@ describe('page navigation context', () => {
       await expect
         .element(screen.getByRole('option', { name: 'Financeiro' }))
         .not.toBeInTheDocument()
-      await userEvent.selectOptions(select, '/verdant/agenda')
-      expect(navigate).toHaveBeenCalledWith({ to: '/verdant/agenda' })
+      await userEvent.selectOptions(select, '/verdant/cadastros')
+      expect(navigate).toHaveBeenCalledWith({ to: '/verdant/cadastros' })
     } finally {
       await page.viewport(1280, 720)
     }

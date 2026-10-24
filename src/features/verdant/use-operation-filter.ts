@@ -30,6 +30,8 @@ export function useOperationFilter(
         to: '.',
         search: (previous) => ({ ...previous, [key]: next }),
         replace: true,
+        resetScroll: false,
+        hash: true,
       })
     },
   ]

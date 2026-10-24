@@ -1213,7 +1213,7 @@ function RegistrationsPage({
   function clearFilters() {
     setQuery(''); setProfessional(''); setFrom(''); setTo(''); setConsent('')
     if (standalone) {
-      void navigate({ to: '.', search: (previous) => ({ ...previous, event: '', form: '' }), replace: true })
+      void navigate({ to: '.', search: (previous) => ({ ...previous, event: '', form: '' }), replace: true, resetScroll: false, hash: true })
     } else {
       setEventId(''); setFormKey('')
     }
@@ -1778,6 +1778,7 @@ function reportPeople(data: VerdantState, kind: Person['kind']) {
 }
 
 export function VerdantReports({ data, embedded = false }: { data: VerdantState; embedded?: boolean }) {
+  const { translate } = useLanguage()
   const admin = useAuthStore(state => state.auth.user?.role.includes('admin'))
   const [eventId, setEventId] = useOperationFilter('event', data.events.find((event) => event.active)?.id || '', !embedded)
   const [lineSort, setLineSort] = useState<'order' | 'time'>('order')
@@ -1882,7 +1883,7 @@ export function VerdantReports({ data, embedded = false }: { data: VerdantState;
     <>
       {embedded ? <div className='verdant-page-heading'><div><div className='verdant-eyebrow'>{<LocalizedText text={"CENTRAL VERDANT"} />}</div><h2>{<LocalizedText text={"Relatórios"} />}</h2><p>{<LocalizedText text={"Imprima ou salve em PDF, ou exporte os dados em CSV."} />}</p></div></div> : <SectionHeading section='exportacoes' />}
       {!embedded && <EventWorkflowNav event={event} />}
-      <Card className='mb-4'><CardHeader><CardTitle>{<LocalizedText text={"Evento e timbrado"} />}</CardTitle><CardDescription>{<LocalizedText text={"Selecione uma data. A escolha aplica-se a todos os relatórios abaixo e fica salva no evento."} />}</CardDescription></CardHeader><CardContent className='grid gap-3 sm:grid-cols-2'><label className='verdant-field'>{<LocalizedText text={"Evento"} />}<select value={eventId} onChange={(e) => setEventId(e.target.value)}><option value=''>{<LocalizedText text={"Selecione um evento"} />}</option>{data.events.filter((item) => item.active).sort((a, b) => a.date.localeCompare(b.date)).map((item) => <option key={item.id} value={item.id}>{compactDate(item.date)} · {item.name}</option>)}</select></label>{event && <label className='verdant-field'>{<LocalizedText text={"Timbrado deste evento"} />}<select value={event.letterheadId ?? ''} onChange={(e) => saveLetterhead(e.target.value)}>{letterheadOptions.map((item) => <option key={item.id || 'none'} value={item.id}>{item.label}</option>)}</select></label>}</CardContent></Card>
+      <Card className='mb-4'><CardHeader><CardTitle>{<LocalizedText text={"Evento e timbrado"} />}</CardTitle><CardDescription>{<LocalizedText text={"Selecione uma data. A escolha aplica-se a todos os relatórios abaixo e fica salva no evento."} />}</CardDescription></CardHeader><CardContent className='grid gap-3 sm:grid-cols-2'><label className='verdant-field'>{<LocalizedText text={"Evento"} />}<select aria-label={translate('Evento dos relatórios')} value={eventId} onChange={(e) => setEventId(e.target.value)}><option value=''>{<LocalizedText text={"Selecione um evento"} />}</option>{data.events.filter((item) => item.active).sort((a, b) => a.date.localeCompare(b.date)).map((item) => <option key={item.id} value={item.id}>{compactDate(item.date)} · {item.name}</option>)}</select></label>{event && <label className='verdant-field'>{<LocalizedText text={"Timbrado deste evento"} />}<select value={event.letterheadId ?? ''} onChange={(e) => saveLetterhead(e.target.value)}>{letterheadOptions.map((item) => <option key={item.id || 'none'} value={item.id}>{item.label}</option>)}</select></label>}</CardContent></Card>
       {event && <DjLineEditor key={`${eventId}-${data.revision}`} data={data} eventId={eventId} update={update} />}
       <details className='mb-4 rounded-lg border p-4'><summary className='cursor-pointer font-semibold'>Histórico e PDFs de escalas</summary><div className='mt-4'><RostersPage data={data} historyOnly /></div></details>
       <div className='verdant-export-grid'>

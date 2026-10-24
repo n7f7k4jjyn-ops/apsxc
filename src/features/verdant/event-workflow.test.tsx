@@ -89,7 +89,7 @@ describe('event workflow', () => {
 
   it('updates the URL in place, preserves other parameters, and follows history', async () => {
     const { screen, router } = await setup(
-      '/verdant/inscricoes?event=event-1&form=DJS&extra=keep'
+      '/verdant/inscricoes?event=event-1&form=DJS&extra=keep#results'
     )
     const historyLength = router.history.length
     await userEvent.fill(
@@ -100,6 +100,7 @@ describe('event workflow', () => {
       .poll(() => router.state.location.search)
       .toEqual({ event: 'event-2', form: 'DJS', extra: 'keep' })
     expect(router.history.length).toBe(historyLength)
+    expect(router.state.location.hash).toBe('results')
     await router.navigate({
       to: '/verdant/inscricoes',
       search: { event: 'event-3', form: 'VIP' },

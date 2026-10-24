@@ -1,7 +1,12 @@
 import { Link, useLocation, useNavigate } from '@tanstack/react-router'
 import { useAuthStore } from '@/stores/auth-store'
 import { trackNavigation } from '@/lib/analytics'
-import { isNavigationActive, navigationPages } from '@/lib/navigation'
+import {
+  getNavigationPage,
+  isNavigationActive,
+  navigationPages,
+  normalizePath,
+} from '@/lib/navigation'
 import { useLanguage } from '@/context/language-provider'
 
 export function AppQuickNav() {
@@ -12,9 +17,7 @@ export function AppQuickNav() {
   const links = navigationPages.filter(
     (page) => page.quick && (!page.admin || admin)
   )
-  const activePage = links.find((page) =>
-    isNavigationActive(pathname, page.path)
-  )
+  const activePage = links.find((page) => page.path === normalizePath(pathname))
   return (
     <nav
       aria-label={translate('Navegação rápida do aplicativo')}
@@ -32,7 +35,7 @@ export function AppQuickNav() {
       >
         {!activePage && (
           <option value='' disabled>
-            {translate('Ir para página')}
+            {translate(getNavigationPage(pathname).title)}
           </option>
         )}
         {links.map(({ title, path }) => (

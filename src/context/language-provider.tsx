@@ -18,6 +18,7 @@ const english: Record<string, string> = {
   'Continuar neste evento': 'Continue with this event',
   'Mais filtros': 'More filters',
   'Buscar inscrições': 'Search registrations',
+  'Evento dos relatórios': 'Reports event',
   'Nenhuma tarefa cadastrada.': 'No tasks yet.',
   'Crie uma tarefa e defina responsáveis e prazos para começar.': 'Create a task and assign owners and deadlines to get started.',
   'Criar tarefa': 'Create task',
