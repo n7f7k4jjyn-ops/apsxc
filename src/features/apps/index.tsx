@@ -195,7 +195,7 @@ export function Apps() {
           <p className='text-muted-foreground'>{<LocalizedText text="Catálogo de serviços. A conexão OAuth/API ainda precisa ser configurada para cada serviço." leadingSpace trailingSpace />}</p>
         </div>
         <div role='status' className='rounded-lg border border-amber-300/60 bg-amber-50/70 px-4 py-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100'>{<LocalizedText text="Esses serviços estão em implantação: as configurações podem ser salvas por administradores. Somente o Meta Pixel está ativo nesta versão; os demais atalhos ainda não." />}</div>
-        {isAdmin && <details id='integracoes' open className='rounded-lg border p-4'>
+        {isAdmin && <details id='integracoes' className='rounded-lg border p-4'>
           <summary className='cursor-pointer font-semibold'>{<LocalizedText text='Configurações administrativas de integrações' />}</summary>
           {settingsLoading ? <p className='pt-4 text-sm text-muted-foreground'>{<LocalizedText text='Carregando configurações…' />}</p> : !settingsLoaded ? <p role='alert' className='pt-4 text-sm text-destructive'>{settingsError || translate('Não foi possível carregar as configurações.')}</p> : <form onSubmit={saveIntegrationSettings} className='mt-4 space-y-4'>
             <p className='text-sm text-muted-foreground'>{<LocalizedText text='As configurações ficam no servidor. Segredos nunca são devolvidos à interface; campos vazios preservam credenciais salvas. O Meta Pixel é o único item ativo: ao salvar o ID, os formulários públicos passam a registrar visualização e envio.' />}</p>
