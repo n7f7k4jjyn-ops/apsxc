@@ -10,7 +10,7 @@ import { djLineRows, djLineSections, djGuests } from './dj-line'
 import { DjLineEditor } from './dj-line-editor'
 import type { PortariaSection } from './portaria-pdf'
 import { RegistryPage } from './registry'
-import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+import { createContext, useContext, useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useBlocker } from '@tanstack/react-router'
 import {
   Archive,
@@ -837,6 +837,32 @@ function EventFormConfigDraftCard({
   )
 }
 
+const FormDraftContext = createContext<((key: string, dirty: boolean) => void) | null>(null)
+
+function FormDialogCard({ title, description, logo, meta, children }: { title: string; description: string; logo: string; meta?: string; children: React.ReactNode }) {
+  const { translate } = useLanguage()
+  const [open, setOpen] = useState(false)
+  const dirtyFields = useRef(new Set<string>())
+  const trackDraft = useCallback((key: string, dirty: boolean) => {
+    if (dirty) dirtyFields.current.add(key)
+    else dirtyFields.current.delete(key)
+  }, [])
+  function changeOpen(next: boolean) {
+    if (!next && dirtyFields.current.size && !window.confirm(translate('Descartar as alterações não salvas deste formulário?'))) return
+    setOpen(next)
+  }
+  return <Dialog open={open} onOpenChange={changeOpen}>
+    <Card className='verdant-export-card'>
+      <CardHeader><div className='flex items-start gap-3'><img className='h-12 w-12 shrink-0 object-contain' src={logo} alt='' loading='lazy' decoding='async' /><div className='min-w-0'><CardTitle>{translate(title)}</CardTitle><CardDescription className='mt-2 line-clamp-2'>{description}</CardDescription></div></div></CardHeader>
+      <CardContent>{meta && <p className='text-xs text-muted-foreground'>{meta}</p>}<div className='verdant-export-actions'><DialogTrigger asChild><Button variant='outline' aria-label={`${translate('Configurar')} ${translate(title)}`}>{translate('Configurar')}<ArrowRight size={15} /></Button></DialogTrigger></div></CardContent>
+    </Card>
+    <DialogContent className='verdant-report-dialog verdant-form-dialog sm:max-w-5xl'>
+      <DialogHeader><DialogTitle>{translate(title)}</DialogTitle><DialogDescription>{translate('Configurações, links públicos e respostas do formulário.')}</DialogDescription></DialogHeader>
+      <FormDraftContext.Provider value={trackDraft}>{children}</FormDraftContext.Provider>
+    </DialogContent>
+  </Dialog>
+}
+
 function FormsPage({ data, update }: { data: VerdantState; update: (mutate: (state: VerdantState) => VerdantState) => Promise<boolean> }) {
   const [filter, setFilter] = useState<FormKey | 'TODOS'>('TODOS')
   return (
@@ -847,16 +873,7 @@ function FormsPage({ data, update }: { data: VerdantState; update: (mutate: (sta
           { key: 'TRABALHE_CONOSCO', title: 'Trabalhe conosco', href: '/trabalhe-conosco', secondaryHref: '/verdant/cadastros?category=candidates', secondaryLabel: 'Consultar cadastros', fallbackLogo: '/images/verdant-logo-colorida.webp', defaultDescription: 'Cadastre seu interesse para oportunidades de trabalho eventual na Verdant. Nossa equipe entrará em contato conforme a necessidade da casa e sua disponibilidade.' },
           { key: 'EQUIPE', title: 'Equipe — atualização cadastral', href: '/equipe', secondaryHref: '/verdant/cadastros?category=team', secondaryLabel: 'Consultar cadastros', fallbackLogo: '/images/verdant-logo-colorida.webp', defaultDescription: 'Este formulário é destinado a quem já presta serviços na Verdant. Atualize seus dados, informe as funções em que atua e sua disponibilidade. As informações serão utilizadas para atualização cadastral e avaliação interna da equipe.' },
         ].map((item) => (
-          <details key={item.key} className='verdant-form-group-accordion'>
-            <summary className='verdant-form-group-summary'>
-              <div className='verdant-form-link-title'>
-                <img src={data.formLogos?.[item.key] || item.fallbackLogo} width={56} height={56} loading='lazy' decoding='async' alt='' />
-                <div><b>{item.title}</b><span>Link público de cadastro.</span></div>
-              </div>
-              <div className='verdant-form-group-summary-meta'>
-                <ChevronDown className='verdant-create-config-chevron' size={16} aria-hidden='true' />
-              </div>
-            </summary>
+          <FormDialogCard key={item.key} title={item.title} description='Link público de cadastro.' logo={data.formLogos?.[item.key] || item.fallbackLogo}>
             <div className='verdant-form-group-body'>
               <FormLogoEditor formKey={item.key} currentLogo={data.formLogos?.[item.key] || ''} fallbackLogo={item.fallbackLogo} update={update} />
               <FormDescriptionEditor
@@ -874,7 +891,7 @@ function FormsPage({ data, update }: { data: VerdantState; update: (mutate: (sta
                 </div>
               </div>
             </div>
-          </details>
+          </FormDialogCard>
         ))}
       </div>
       <div className='verdant-note'><Clock3 size={16} /><span>{<LocalizedText text="A abertura padrão é terça-feira, às 20h. O encerramento é independente para cada evento: 19h na data, ou 15h para Aniversário. Datas novas podem ser escolhidas livremente, inclusive feriados." />}</span></div>
@@ -886,15 +903,7 @@ function FormsPage({ data, update }: { data: VerdantState; update: (mutate: (sta
           const registrations = sortRows(visibleRegistrations(data).filter((row) => row.formKey === definition.key), (row) => row.createdAt, 'desc').slice(0, 10)
           const registrationCount = visibleRegistrations(data).filter((row) => row.formKey === definition.key).length
           return (
-            <details key={definition.key} className='verdant-form-group-accordion'>
-              <summary className='verdant-form-group-summary'>
-                <div className='verdant-form-link-title'><img src={definition.icon} width={56} height={56} loading='lazy' decoding='async' alt='' /><div><b><LocalizedText text={definition.title} /></b><span>{data.formDescriptions?.[definition.key] ?? definition.description}</span></div></div>
-                <div className='verdant-form-group-summary-meta'>
-                  <span className='verdant-counter'>{enabled} de {configs.length} datas habilitadas</span>
-                  <span className='verdant-counter'>{registrationCount} <LocalizedText text='respostas' /></span>
-                  <ChevronDown className='verdant-create-config-chevron' size={16} aria-hidden='true' />
-                </div>
-              </summary>
+            <FormDialogCard key={definition.key} title={definition.title} description={data.formDescriptions?.[definition.key] ?? definition.description} logo={data.formLogos?.[definition.key] || definition.icon} meta={`${enabled} de ${configs.length} datas habilitadas · ${registrationCount} respostas`}>
               <div className='verdant-form-group-body'>
               <FormLogoEditor formKey={definition.key} currentLogo={data.formLogos?.[definition.key] || ''} fallbackLogo={definition.icon} update={update} />
               <FormDescriptionEditor
@@ -930,7 +939,7 @@ function FormsPage({ data, update }: { data: VerdantState; update: (mutate: (sta
                   {registrationCount > 0 && <Link className='verdant-form-registrations-link' to='/verdant/inscricoes' search={{ form: definition.key }}><LocalizedText text='Ver todas as respostas' /> <ArrowRight size={14} /></Link>}
                 </section>
               </div>
-            </details>
+            </FormDialogCard>
           )
         })}
       </div>
@@ -997,6 +1006,11 @@ function FormLogoEditor({ formKey, currentLogo, fallbackLogo, update }: { formKe
 
 function FormDescriptionEditor({ formKey, description, update }: { formKey: string; description: string; update: (mutate: (state: VerdantState) => VerdantState) => Promise<boolean> }) {
   const [draft, setDraft] = useState(description)
+  const trackDraft = useContext(FormDraftContext)
+  useEffect(() => {
+    trackDraft?.(`description-${formKey}`, draft !== description)
+    return () => trackDraft?.(`description-${formKey}`, false)
+  }, [draft, description, formKey, trackDraft])
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -1029,6 +1043,11 @@ function FormDescriptionEditor({ formKey, description, update }: { formKey: stri
 
 function FormConfigEditor({ config, event, data, update }: { config: FormConfig; event?: VerdantEvent; data: VerdantState; update: (mutate: (state: VerdantState) => VerdantState) => Promise<boolean> }) {
   const [draft, setDraft] = useState(config)
+  const trackDraft = useContext(FormDraftContext)
+  useEffect(() => {
+    trackDraft?.(config.id, JSON.stringify(draft) !== JSON.stringify(config))
+    return () => trackDraft?.(config.id, false)
+  }, [draft, config, trackDraft])
   // Keep the local editor draft in sync when the selected form configuration changes.
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setDraft(config), [config])
@@ -1076,10 +1095,9 @@ function FormConfigEditor({ config, event, data, update }: { config: FormConfig;
           <div><b className='text-sm'>{<LocalizedText text={"Campos do formulário"} />}</b><p className='text-xs text-muted-foreground'>{<LocalizedText text={"Escolha quais dados a pessoa precisa informar nesta lista."} />}</p></div>
           <Button type='button' size='sm' variant='outline' onClick={() => setFieldsDialogOpen(true)}><Settings2 size={14} />{<LocalizedText text={"Configurar obrigatoriedade"} leadingSpace />}</Button>
         </div>
-        {fieldsDialogOpen && <div className='fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4' onMouseDown={(e) => { if (e.target === e.currentTarget) setFieldsDialogOpen(false) }}>
-          <section className='w-full max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl border bg-background p-5 shadow-2xl' role='dialog' aria-modal='true' aria-labelledby={`required-fields-${config.id}`}>
-            <h3 id={`required-fields-${config.id}`} className='text-lg font-semibold'>{<LocalizedText text={"Campos obrigatórios"} />}</h3>
-            <p className='mb-4 mt-1 text-sm text-muted-foreground'>{<LocalizedText text={"Essas regras valem para esta lista e esta data."} />}</p>
+        <Dialog open={fieldsDialogOpen} onOpenChange={setFieldsDialogOpen}>
+          <DialogContent>
+            <DialogHeader><DialogTitle><LocalizedText text='Campos obrigatórios' /></DialogTitle><DialogDescription><LocalizedText text='Essas regras valem para esta lista e esta data.' /></DialogDescription></DialogHeader>
             {([
               ['name', 'Nome completo'],
               ['whatsapp', 'WhatsApp com DDD'],
@@ -1091,8 +1109,8 @@ function FormConfigEditor({ config, event, data, update }: { config: FormConfig;
             </label>)}
             <p className='mb-4 text-xs text-muted-foreground'>{<LocalizedText text={"Por padrão, a pessoa escolhe Sim ou Não. Marcar Não é permitido; o aceite para receber novidades continua voluntário."} />}</p>
             <div className='flex justify-end'><Button type='button' onClick={() => setFieldsDialogOpen(false)}>{<LocalizedText text={"Concluir"} />}</Button></div>
-          </section>
-        </div>}
+          </DialogContent>
+        </Dialog>
         {message && <div role={messageIsError ? 'alert' : 'status'} aria-live={messageIsError ? 'assertive' : 'polite'} className={`verdant-flash ${messageIsError ? 'warning' : ''}`}>{message}</div>}
         <div className='verdant-config-footer'><small>{open ? `Aberto agora · encerra ${compactDate(event.date)} às ${draft.cutoff}` : `Link fixo: /lista/${slugByForm[config.key]}`}</small><Button size='sm' type='submit'>{<LocalizedText text={"Salvar configuração"} />}</Button></div>
       </form>

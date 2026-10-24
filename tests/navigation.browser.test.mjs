@@ -146,6 +146,50 @@ test('event workflow and touch navigation across desktop, tablet and mobile', { 
         }
       }
     }
+    await page.goto(`${base}/verdant/formularios`)
+    const formCards = page.locator('.verdant-form-card-grid .verdant-export-card')
+    assert.equal(await formCards.count(), 8)
+    for (const width of [390, 1280]) {
+      await page.setViewportSize({ width, height: 900 })
+      for (let i = 0; i < await formCards.count(); i++) {
+        const trigger = formCards.nth(i).getByRole('button')
+        await trigger.click()
+        const dialog = page.getByRole('dialog')
+        await expect(dialog.getByText('Logo do formulário', { exact: true })).toBeVisible()
+        await expect(dialog.getByRole('button', { name: 'Salvar texto do formulário', exact: true })).toBeVisible()
+        const box = await dialog.boundingBox()
+        assert.ok(box.x >= -1 && box.x + box.width <= width + 1, 'Form dialog must fit viewport')
+        await dialog.getByRole('button', { name: 'Fechar', exact: true }).click()
+        await expect(dialog).toBeHidden()
+        await expect(trigger).toBeFocused()
+      }
+    }
+    await page.getByRole('button', { name: 'Configurar Trabalhe conosco', exact: true }).click()
+    const formDialog = page.getByRole('dialog', { name: 'Trabalhe conosco', exact: true })
+    const description = formDialog.getByLabel('Texto principal do formulário', { exact: true })
+    const originalDescription = await description.inputValue()
+    await description.fill('Rascunho de teste não salvo')
+    const rejectClose = page.waitForEvent('dialog')
+    const escape = page.keyboard.press('Escape')
+    await (await rejectClose).dismiss()
+    await escape
+    await expect(description).toHaveValue('Rascunho de teste não salvo')
+    const acceptClose = page.waitForEvent('dialog')
+    const closeForm = formDialog.getByRole('button', { name: 'Fechar', exact: true }).click()
+    await (await acceptClose).accept()
+    await closeForm
+    await expect(formDialog).toBeHidden()
+    await page.getByRole('button', { name: 'Configurar Trabalhe conosco', exact: true }).click()
+    await expect(formDialog.getByLabel('Texto principal do formulário', { exact: true })).toHaveValue(originalDescription)
+    await formDialog.getByRole('button', { name: 'Fechar', exact: true }).click()
+    await formCards.nth(2).getByRole('button').click()
+    await page.getByRole('dialog').locator('.verdant-config-card summary').first().click()
+    await page.getByRole('button', { name: 'Configurar obrigatoriedade', exact: true }).first().click()
+    await expect(page.getByRole('dialog', { name: 'Campos obrigatórios', exact: true })).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('dialog')).toHaveCount(1)
+    await page.getByRole('dialog').getByRole('button', { name: 'Fechar', exact: true }).click()
+    await page.goto(`${base}/verdant/exportacoes?event=${event.id}`)
     await page.setViewportSize({ width: 375, height: 812 })
     await page.getByRole('combobox', { name: 'Ir para página' }).selectOption('/verdant/listas')
     await expect(page).toHaveURL(`${base}/verdant/listas`)

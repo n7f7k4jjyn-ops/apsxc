@@ -554,3 +554,7 @@
 .verdant-report-dialog > * { min-width: 0; }
 .verdant-report-dialog .verdant-export-actions { margin-top: 0; }
 .verdant-report-dialog .verdant-export-actions > button { min-height: 44px; }
+
+.verdant-form-dialog .verdant-form-group-body { padding: 0; }
+.verdant-form-dialog .verdant-public-url { min-width: 0; overflow-wrap: anywhere; white-space: normal; }
+.verdant-form-dialog .verdant-form-group-actions { flex-wrap: wrap; }
