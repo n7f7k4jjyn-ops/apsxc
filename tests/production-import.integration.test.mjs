@@ -111,6 +111,7 @@ test('production import through authenticated APIs: backup, partial recovery, li
       assert.equal(await ledgerTable.locator('tbody tr').count(), plan.entries.length + 2)
       await page.getByRole('navigation', { name: 'Navegação rápida do aplicativo' }).getByRole('link', { name: 'Resumo', exact: true }).click()
       await page.getByRole('button', { name: 'Resumo financeiro', exact: true }).click()
+      await page.getByRole('heading', { name: 'Comparação entre períodos' }).waitFor()
       await page.getByLabel('Data inicial', { exact: true }).fill('2024-01-01')
       await page.getByLabel('Data final', { exact: true }).fill('2024-01-07')
       await page.getByRole('heading', { name: 'Comparação entre períodos' }).waitFor()
@@ -180,5 +181,6 @@ test('production import through authenticated APIs: backup, partial recovery, li
     await assert.rejects(api('/api/finance/production-backup', {}), e => e.status === 500)
     assert.deepEqual((await api('/api/finance')).entries, after.finance.entries)
     t.diagnostic(JSON.stringify({ sourcePeople: bundle.people.length, sourceGigs: bundle.engagements.length, newPeople: plan.newPeople, newEvents: plan.newEvents, newTeam: plan.teamToCreate.length, entriesWritten: plan.entries.length, bindingIssues: plan.issues.length, repeatedEntries: again.entries.length, browser: process.env.PRODUCTION_IMPORT_BROWSER === '1' }))
+  } catch (error) { if(browser){for(const context of browser.contexts())for(const page of context.pages())t.diagnostic((await page.locator('body').innerText()).slice(-16000))} throw error
   } finally { if (browser) await browser.close(); await stop(); await rm(directory, { recursive: true, force: true }) }
 })
