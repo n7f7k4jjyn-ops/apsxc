@@ -40,4 +40,5 @@ dist-ssr
 /storage/job-applications.json
 /storage/team-registrations.json
 /storage/finance.json
+/storage/backups/
 /storage/finance.json.*.tmp
