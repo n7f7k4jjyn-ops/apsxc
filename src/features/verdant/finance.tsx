@@ -257,7 +257,7 @@ function AdminFinance() {
   )
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
-  const [eventId, setEventId] = useState('')
+  const [eventId, setEventId] = useState(()=>new URLSearchParams(window.location.search).get('event') || '')
   const [type, setType] = useState('')
   const [status, setStatus] = useState('')
   const [category, setCategory] = useState('')
@@ -632,7 +632,6 @@ function AdminFinance() {
 
   return (
     <section className='finance-page' aria-label='Financeiro'>
-      <ProductionImportPanel onImported={() => void load()} />
       <div className='finance-heading'>
         <div>
           <h1>Financeiro</h1>
@@ -662,6 +661,8 @@ function AdminFinance() {
           Revisar dados atualizados antes de reaplicar
         </Button>
       )}
+      <details className='finance-period-details'>
+        <summary>Período: {from || 'Início'} → {to || 'Hoje'} · {eventId ? eventOptions.find(event=>event.id===eventId)?.name : 'Todos os eventos'} · Alterar filtros</summary>
       <Card className='finance-panel'>
         <h2>Período e evento</h2>
         <div className='finance-actions'>
@@ -721,8 +722,10 @@ function AdminFinance() {
           considera todo o histórico.
         </p>
       </Card>
+      </details>
+      {report && <nav className='finance-compact-summary' aria-label='Indicadores financeiros'>{[['Recebido',report.incoming],['Pago',report.outgoing],['Saldo',report.balance],['A pagar',report.payable],['A receber',report.receivable]].map(([label,value])=><button type='button' key={label} onClick={()=>setTab(label==='A pagar'||label==='A receber'?'ledger':'cash')}><span>{label}</span><strong>{formatCents(Number(value))}</strong></button>)}</nav>}
       {report && (
-        <section aria-label='Resumo financeiro'>
+        <details className='finance-period-details'><summary>Detalhar caixa registrado e pagamentos</summary><section aria-label='Resumo financeiro'>
           <h2>Caixa registrado</h2>
           <p>
             Saldo derivado exclusivamente das baixas registradas. Saldo inicial
@@ -749,7 +752,7 @@ function AdminFinance() {
               </Card>
             ))}
           </div>
-        </section>
+        </section></details>
       )}
       <Card className='finance-panel'>
         <div className='finance-actions' aria-label='Visualização'>
@@ -926,6 +929,7 @@ function AdminFinance() {
         </>
         )}
       </Card>
+      <ProductionImportPanel onImported={() => void load()} />
       <Card className='finance-panel'>
         <h2>Importar planilha</h2>
         <p>

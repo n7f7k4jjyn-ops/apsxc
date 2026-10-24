@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { djLineRows, djLineSections, djGuests, validateDjOrder } from '../src/features/verdant/dj-line.ts'
+import { applyDjLine, djLineRows, djLineSections, djGuests, validateDjOrder } from '../src/features/verdant/dj-line.ts'
 import { createPortariaPdf } from '../src/features/verdant/portaria-pdf.ts'
 
 const fixture = () => ({ events: [{ id: 'event', date: '2026-10-24', name: 'Noite', eventTime: '22:00' }], people: [
@@ -31,4 +31,17 @@ test('line PDF contains schedule sections and no guest list', async () => {
   assert.equal(JSON.stringify(sections).includes('Convidado'), false)
   const pdf = await createPortariaPdf({ eventName: 'Noite', eventDate: '24/10/2026', reportLabel: 'Line de DJs', sections })
   assert.ok(pdf.length > 500)
+})
+
+test('second set appears in print and replacement retains historical registrations and independent track order', () => {
+ const state=fixture()
+ const rows=djLineRows(state,'event').map(row=>({...row,originalId:row.id,secondTime:'03:00'}))
+ rows[0]={...rows[0],id:'c',name:'DJ Outro',track:'LAND'}
+ const next=applyDjLine(state,'event',rows)
+ assert.equal(next.people.find(p=>p.id==='c').eventDetails.event.secondTime,'03:00')
+ assert.equal(next.people.find(p=>p.id==='b').eventIds.includes('event'),false)
+ assert.deepEqual(next.registrations,state.registrations)
+ assert.equal(state.people.find(p=>p.id==='b').eventIds.includes('event'),true)
+ assert.match(djLineSections(djLineRows(next,'event'))[0].groups[0].names[0],/2º: 03:00/)
+ assert.throws(()=>applyDjLine(state,'event',[rows[0],{...rows[1],id:'c'}]),/mesmo DJ/)
 })

@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useAuthStore } from '@/stores/auth-store'
 import { Button } from '@/components/ui/button'
 import type { VerdantState } from './data'
+import { formatCents, type FinanceEntry } from './finance-data'
+import { RosterCalendar } from './roster-calendar'
 import {
   baseRole,
   moveRosterEntry,
@@ -47,6 +49,24 @@ export function RostersPage({
     [busy, setBusy] = useState(false),
     [loading, setLoading] = useState(true),
     [notice, setNotice] = useState('')
+  const [financeEntries, setFinanceEntries] = useState<FinanceEntry[] | null>(
+    null
+  )
+  useEffect(() => {
+    if (!admin) return
+    let active = true
+    api('/api/finance')
+      .then((result) => {
+        if (active) setFinanceEntries(result.entries)
+      })
+      .catch(() => {
+        if (active) setFinanceEntries(null)
+      })
+    return () => {
+      active = false
+    }
+  }, [admin])
+  const [selectedDate, setSelectedDate] = useState('')
   const [search, setSearch] = useState(''),
     [availabilityFilter, setAvailabilityFilter] = useState(''),
     [filter, setFilter] = useState(''),
@@ -200,12 +220,17 @@ export function RostersPage({
         person.name.toLocaleLowerCase().includes(search.toLocaleLowerCase()) &&
         !draft?.entries.some((entry) => entry.memberId === person.id) &&
         person.roles.some((r) => allowed.some((a) => baseRole(a) === r)) &&
-        (!availabilityFilter || person.availability.some((day) => day.toLowerCase() === availabilityFilter.toLowerCase()))
+        (!availabilityFilter ||
+          person.availability.some(
+            (day) => day.toLowerCase() === availabilityFilter.toLowerCase()
+          ))
     )
     .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { numeric: true }))
 
   const candidatesForRole = (selectedRole: string) =>
-    candidatePool.filter((person) => person.roles.includes(baseRole(selectedRole)))
+    candidatePool.filter((person) =>
+      person.roles.includes(baseRole(selectedRole))
+    )
 
   const shown = rosters.filter(
     (row) =>
@@ -297,55 +322,101 @@ export function RostersPage({
               </a>
             )}
           </div>
+          {!loading && (
+            <RosterCalendar
+              rows={shown}
+              selected={selectedDate}
+              onSelect={setSelectedDate}
+            />
+          )}
           {loading ? (
             <p role='status'>Carregando escalas…</p>
           ) : shown.length ? (
             <div className='roster-list'>
-              {shown.map((row) => (
-                <article className='roster-card' key={row.id}>
-                  <div>
-                    <b>
-                      {displayDate(row.date)} · {row.eventName}
-                    </b>
-                    <p>
-                      {row.kind === 'security' ? 'Segurança' : 'STAFF'} ·{' '}
-                      {row.entries.length} profissionais ·{' '}
-                      {row.status === 'draft' ? 'Rascunho' : 'Finalizada'}
-                    </p>
-                  </div>
-                  <div className='roster-actions'>
-                    {!historyOnly && (
-                      <>
-                        <Button variant='outline' onClick={() => start(row)}>
-                          Editar
-                        </Button>
-                        <Button
-                          variant='outline'
-                          onClick={() =>
-                            start({
-                              ...row,
-                              id: undefined,
-                              version: undefined,
-                              date: '',
-                              eventId: '',
-                              status: 'draft',
-                              entries: row.entries.map((entry) => ({
-                                ...entry,
-                                exitDate: undefined,
-                              })),
-                            })
-                          }
-                        >
-                          Duplicar
-                        </Button>
-                      </>
-                    )}
-                    <Button disabled={busy} onClick={() => void generate(row)}>
-                      Gerar PDF · Modelo {row.template}
-                    </Button>
-                  </div>
-                </article>
-              ))}
+              {selectedDate &&
+                !shown.some((row) => row.date === selectedDate) && (
+                  <p>Nenhuma escala neste dia.</p>
+                )}
+              {shown
+                .filter((row) => !selectedDate || row.date === selectedDate)
+                .map((row) => (
+                  <article className='roster-card' key={row.id}>
+                    <div>
+                      <b>
+                        {displayDate(row.date)} · {row.eventName}
+                      </b>
+                      <p>
+                        {row.kind === 'security' ? 'Segurança' : 'STAFF'} ·{' '}
+                        {row.entries.length} profissionais ·{' '}
+                        {row.status === 'draft' ? 'Rascunho' : 'Finalizada'}
+                      </p>
+                      <p className='text-sm text-muted-foreground'>
+                        {!row.eventId
+                          ? 'Vincule um evento para consultar os pagamentos.'
+                          : financeEntries === null
+                            ? 'Pagamentos indisponíveis.'
+                            : (() => {
+                                const members = new Set(
+                                  row.entries.map(
+                                    (entry) => `team:${entry.memberId}`
+                                  )
+                                )
+                                const linked = financeEntries.filter(
+                                  (entry) =>
+                                    entry.type === 'payable' &&
+                                    entry.category === 'team' &&
+                                    entry.eventId === row.eventId &&
+                                    members.has(entry.beneficiaryId) &&
+                                    entry.status !== 'cancelled'
+                                )
+                                return linked.length
+                                  ? `A pagar: ${formatCents(linked.filter((entry) => entry.status === 'pending').reduce((sum, entry) => sum + entry.amountCents, 0))} · Pago: ${formatCents(linked.filter((entry) => entry.status === 'settled').reduce((sum, entry) => sum + entry.amountCents, 0))}`
+                                  : 'Nenhum valor de pagamento cadastrado para esta equipe e evento.'
+                              })()}
+                      </p>
+                      <a
+                        className='text-sm underline'
+                        href={`/verdant/financeiro?event=${encodeURIComponent(row.eventId)}`}
+                      >
+                        Consultar valores e pagamentos
+                      </a>
+                    </div>
+                    <div className='roster-actions'>
+                      {!historyOnly && (
+                        <>
+                          <Button variant='outline' onClick={() => start(row)}>
+                            Editar
+                          </Button>
+                          <Button
+                            variant='outline'
+                            onClick={() =>
+                              start({
+                                ...row,
+                                id: undefined,
+                                version: undefined,
+                                date: '',
+                                eventId: '',
+                                status: 'draft',
+                                entries: row.entries.map((entry) => ({
+                                  ...entry,
+                                  exitDate: undefined,
+                                })),
+                              })
+                            }
+                          >
+                            Duplicar
+                          </Button>
+                        </>
+                      )}
+                      <Button
+                        disabled={busy}
+                        onClick={() => void generate(row)}
+                      >
+                        Gerar PDF · Modelo {row.template}
+                      </Button>
+                    </div>
+                  </article>
+                ))}
             </div>
           ) : (
             <p className='rounded-lg border border-dashed p-6'>
@@ -412,7 +483,9 @@ export function RostersPage({
                     eventId: '',
                     eventName: 'Verdant CWB',
                   })
-                  setAvailabilityFilter(e.target.value ? weekday(e.target.value) : '')
+                  setAvailabilityFilter(
+                    e.target.value ? weekday(e.target.value) : ''
+                  )
                 }}
               />
             </label>
@@ -442,18 +515,28 @@ export function RostersPage({
               <a className='underline' href='/verdant/cadastros?category=team'>
                 Cadastros → Equipe
               </a>
-              . A inclusão abaixo respeita função/cargo e disponibilidade selecionados.
+              . A inclusão abaixo respeita função/cargo e disponibilidade
+              selecionados.
             </p>
             <div className='roster-toolbar'>
               <label>
                 Disponibilidade
                 <select
                   aria-label='Disponibilidade para adicionar'
-                  value={['Quinta-feira','Sexta-feira','Sábado','Domingo'].find((day) => day.toLowerCase() === availabilityFilter.toLowerCase()) ?? ''}
+                  value={
+                    ['Quinta-feira', 'Sexta-feira', 'Sábado', 'Domingo'].find(
+                      (day) =>
+                        day.toLowerCase() === availabilityFilter.toLowerCase()
+                    ) ?? ''
+                  }
                   onChange={(e) => setAvailabilityFilter(e.target.value)}
                 >
                   <option value=''>Todas as disponibilidades</option>
-                  {['Quinta-feira','Sexta-feira','Sábado','Domingo'].map((day) => <option key={day}>{day}</option>)}
+                  {['Quinta-feira', 'Sexta-feira', 'Sábado', 'Domingo'].map(
+                    (day) => (
+                      <option key={day}>{day}</option>
+                    )
+                  )}
                 </select>
               </label>
               <label>
@@ -473,14 +556,18 @@ export function RostersPage({
                   <div key={functionRole} className='rounded-lg border p-3'>
                     <div className='mb-2 flex items-center justify-between gap-2'>
                       <b>{functionRole}</b>
-                      <span className='text-xs text-muted-foreground'>{matches.length} disponível(is)</span>
+                      <span className='text-xs text-muted-foreground'>
+                        {matches.length} disponível(is)
+                      </span>
                     </div>
                     <select
                       aria-label={`Adicionar ${functionRole}`}
                       value=''
                       disabled={!draft.date || busy || !matches.length}
                       onChange={(e) => {
-                        const person = team.find((row) => row.id === e.target.value)
+                        const person = team.find(
+                          (row) => row.id === e.target.value
+                        )
                         if (!person) return
                         change({
                           entries: [
@@ -498,9 +585,19 @@ export function RostersPage({
                         })
                       }}
                     >
-                      <option value=''>{!draft.date ? 'Selecione a data primeiro' : matches.length ? 'Adicionar profissional…' : 'Nenhum profissional com estes filtros'}</option>
+                      <option value=''>
+                        {!draft.date
+                          ? 'Selecione a data primeiro'
+                          : matches.length
+                            ? 'Adicionar profissional…'
+                            : 'Nenhum profissional com estes filtros'}
+                      </option>
                       {matches.map((person) => (
-                        <option key={person.id} value={person.id}>{person.name} · {person.availability.join(', ') || 'sem disponibilidade informada'}</option>
+                        <option key={person.id} value={person.id}>
+                          {person.name} ·{' '}
+                          {person.availability.join(', ') ||
+                            'sem disponibilidade informada'}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -704,7 +801,8 @@ export function RostersPage({
             </Button>
           </div>
           <p className='text-xs text-muted-foreground'>
-            O PDF usa somente a última versão salva. Salve o rascunho antes de gerar ou visualizar o arquivo.
+            O PDF usa somente a última versão salva. Salve o rascunho antes de
+            gerar ou visualizar o arquivo.
           </p>
         </form>
       )}

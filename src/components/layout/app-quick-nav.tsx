@@ -11,8 +11,6 @@ export function AppQuickNav() {
     ['Relatórios', '/verdant/exportacoes'],
     ['Listas', '/verdant/listas'],
     ['Formulários', '/verdant/formularios'],
-    ['DJs', '/verdant/djs'],
-    ['Influencers', '/verdant/influencers'],
     ['Cadastros', '/verdant/cadastros'],
     ['Conteúdo', '/verdant/conteudo'],
     ['Tarefas', '/tasks'],
@@ -32,8 +30,8 @@ export function AppQuickNav() {
         <Link
           key={to}
           to={to}
-          aria-current={pathname === to ? 'page' : undefined}
-          className={`shrink-0 rounded-md px-3 py-2 text-sm font-medium hover:bg-accent ${pathname === to ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}
+          aria-current={(pathname === to || (to === '/verdant/cadastros' && ['/verdant/djs', '/verdant/influencers'].includes(pathname))) ? 'page' : undefined}
+          className={`shrink-0 rounded-md px-3 py-2 text-sm font-medium hover:bg-accent ${(pathname === to || (to === '/verdant/cadastros' && ['/verdant/djs', '/verdant/influencers'].includes(pathname))) ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}
         >
           {title}
         </Link>

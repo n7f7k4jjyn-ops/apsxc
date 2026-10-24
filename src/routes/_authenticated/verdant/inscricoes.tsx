@@ -2,5 +2,5 @@ import { createFileRoute } from '@tanstack/react-router'
 import { VerdantWorkspace } from '@/features/verdant'
 
 export const Route = createFileRoute('/_authenticated/verdant/inscricoes')({
-  component: () => <VerdantWorkspace sectionName='clientes' />,
+  component: () => <VerdantWorkspace sectionName='respostas' />,
 })

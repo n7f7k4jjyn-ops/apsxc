@@ -11,11 +11,13 @@ export function ColumnFilterControl({
   onChange,
   placeholder,
   options,
+  inputType = 'search',
 }: {
   label: string
   value: string
   onChange: (value: string) => void
   placeholder?: string
+  inputType?: 'search' | 'date'
   options?: ColumnFilterOption[]
 }) {
   const { translate } = useLanguage()
@@ -48,7 +50,7 @@ export function ColumnFilterControl({
             </select>
           ) : (
             <input
-              type='search'
+              type={inputType}
               aria-label={`${translate('Filtrar')}: ${translate(label)}`}
               value={value}
               onChange={(event) => onChange(event.target.value)}

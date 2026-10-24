@@ -1,4 +1,4 @@
-import { SortButton } from './list-controls'
+import { ColumnFilterControl, SortButton } from './list-controls'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { useAuthStore } from '@/stores/auth-store'
@@ -191,7 +191,6 @@ export function RegistryPage({
     permitted,
   ])
   function sortHeader(key: string, text: string) {
-    if (category === 'clients') return text
     const active = sort === key
     return <SortButton label={text} active={active} direction={dir} onClick={() => { setDir(active && dir === 'asc' ? 'desc' : 'asc'); setSort(key); setPage(0) }} />
   }  function choose(value: Category) {
@@ -377,82 +376,14 @@ export function RegistryPage({
         </p>
       ) : (
         <>
-          <div className='registry-toolbar'>
-            <label className='registry-search'>
-              <span className='sr-only'>Buscar em {label}</span>
-              <input
-                type='search'
-                value={query}
-                onChange={(event) => {
-                  setQuery(event.target.value)
-                  setPage(0)
-                }}
-                placeholder='Buscar nome ou contato'
-              />
-            </label>
-            {category === 'clients' ? (
-              <select
-                aria-label='Filtrar clientes por evento'
-                value={event}
-                onChange={(e) => {
-                  setEvent(e.target.value)
-                  setPage(0)
-                }}
-              >
-                <option value=''>Todos os eventos e base histórica</option>
-                {data.events.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name} · {item.date}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <>
-                <select
-                  aria-label='Filtrar função'
-                  value={role}
-                  onChange={(e) => {
-                    setRole(e.target.value)
-                    setPage(0)
-                  }}
-                >
-                  <option value=''>Todas as funções</option>
-                  {roles.map((item) => (
-                    <option key={item}>{item}</option>
-                  ))}
-                </select>
-                <select
-                  aria-label='Filtrar disponibilidade'
-                  value={availability}
-                  onChange={(e) => {
-                    setAvailability(e.target.value)
-                    setPage(0)
-                  }}
-                >
-                  <option value=''>Todas as disponibilidades</option>
-                  {['Quinta-feira','Sexta-feira','Sábado','Domingo'].map((item) => (
-                    <option key={item}>{item}</option>
-                  ))}
-                </select>
-              </>
-            )}
-            {(category === 'candidates' || category === 'team') && (
-              <select
-                aria-label='Filtrar avaliação'
-                value={status}
-                onChange={(e) => {
-                  setStatus(e.target.value)
-                  setPage(0)
-                }}
-              >
-                <option value=''>Todos os status</option>
-                {Object.entries(category === 'team' ? teamStatuses : statuses).map(([value, text]) => (
-                  <option key={value} value={value}>
-                    {text}
-                  </option>
-                ))}
-              </select>
-            )}
+          <div className='verdant-column-filter-bar'>
+            <ColumnFilterControl label='Nome / contato' value={query} onChange={value=>{setQuery(value);setPage(0)}} />
+            {category === 'clients' ? <ColumnFilterControl label='Evento' value={event} onChange={value=>{setEvent(value);setPage(0)}} options={[{value:'',label:'Todos os eventos'},...data.events.slice().sort((a,b)=>a.date.localeCompare(b.date)).map(item=>({value:item.id,label:`${item.date} · ${item.name}`}))]} /> : <>
+              <ColumnFilterControl label='Função' value={role} onChange={value=>{setRole(value);setPage(0)}} options={[{value:'',label:'Todas as funções'},...roles.map(value=>({value,label:value}))]} />
+              <ColumnFilterControl label='Disponibilidade' value={availability} onChange={value=>{setAvailability(value);setPage(0)}} options={[{value:'',label:'Todas as disponibilidades'},...weekDays.map(value=>({value,label:value}))]} />
+              <ColumnFilterControl label='Status' value={status} onChange={value=>{setStatus(value);setPage(0)}} options={[{value:'',label:'Todos os status'},...Object.entries(category==='team'?teamStatuses:statuses).map(([value,label])=>({value,label}))]} />
+            </>}
+            <Button size='sm' variant='ghost' onClick={()=>{setQuery('');setEvent('');setRole('');setAvailability('');setStatus('');setPage(0)}}>Limpar filtros</Button>
             <Button
               variant='outline'
               disabled={loading}

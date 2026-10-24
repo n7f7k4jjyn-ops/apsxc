@@ -1092,10 +1092,13 @@ function listStatus(data: VerdantState, config: FormConfig, now = Date.now()) {
 }
 
 function ListsPage({ data, update }: { data: VerdantState; update: (mutate: (state: VerdantState) => VerdantState) => Promise<boolean> }) {
+  const [sortKey, setSortKey] = useState<'date'|'event'|'list'|'status'>('date')
+  const [direction, setDirection] = useState<SortDirection>('asc')
+  function toggleSort(key: typeof sortKey){setDirection(key===sortKey && direction==='asc'?'desc':'asc');setSortKey(key)}
   const [eventId, setEventId] = useState('')
   const [formKey, setFormKey] = useState('')
   const [date, setDate] = useState('')
-  const [status, setStatus] = useState<ListStatusFilter>('active')
+  const [status, setStatus] = useState<ListStatusFilter>('all')
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 60_000)
@@ -1111,7 +1114,7 @@ function ListsPage({ data, update }: { data: VerdantState; update: (mutate: (sta
       if (status === 'all') return true
       return row.status === status
     })
-    .sort((a, b) => `${a.event?.date || ''}|${formTitle(a.config.key)}`.localeCompare(`${b.event?.date || ''}|${formTitle(b.config.key)}`, 'pt-BR'))
+    .sort((a,b)=>{const value=(row:typeof a)=>sortKey==='event'?row.event?.name||'':sortKey==='list'?formTitle(row.config.key):sortKey==='status'?row.status:row.event?.date||'';return value(a).localeCompare(value(b),'pt-BR',{numeric:true})*(direction==='asc'?1:-1)||a.config.id.localeCompare(b.config.id)})
 
   async function setLifecycle(config: FormConfig, action: 'archive' | 'restore' | 'delete') {
     const stamp = new Date().toISOString()
@@ -1140,15 +1143,16 @@ function ListsPage({ data, update }: { data: VerdantState; update: (mutate: (sta
       <SectionHeading section='listas' />
       <Card>
         <CardContent className='pt-6'>
-          <div className='mb-4 grid gap-3 md:grid-cols-4'>
-            <label className='verdant-field'><span>Evento</span><select value={eventId} onChange={(e) => setEventId(e.target.value)}><option value=''>Todos os eventos</option>{data.events.slice().sort((a,b)=>a.date.localeCompare(b.date)).map((event)=><option key={event.id} value={event.id}>{compactDate(event.date)} · {event.name}</option>)}</select></label>
-            <label className='verdant-field'><span>Data</span><input type='date' value={date} onChange={(e)=>setDate(e.target.value)} /></label>
-            <label className='verdant-field'><span>Lista</span><select value={formKey} onChange={(e)=>setFormKey(e.target.value)}><option value=''>Todas as listas</option>{FORM_DEFS.map((form)=><option key={form.key} value={form.key}>{form.title}</option>)}</select></label>
-            <label className='verdant-field'><span>Situação</span><select value={status} onChange={(e)=>setStatus(e.target.value as ListStatusFilter)}><option value='active'>Ativo</option><option value='upcoming'>Em breve</option><option value='closed'>Encerrado</option><option value='disabled'>Desabilitado</option><option value='archived'>Arquivado</option><option value='deleted'>Excluído</option><option value='all'>Todos</option></select></label>
+          <div className='verdant-column-filter-bar'>
+            <ColumnFilterControl label='Evento' value={eventId} onChange={setEventId} options={[{value:'',label:'Todos os eventos'}, ...data.events.slice().sort((a,b)=>a.date.localeCompare(b.date)).map(event=>({value:event.id,label:`${compactDate(event.date)} · ${event.name}`}))]} />
+            <ColumnFilterControl label='Data' value={date} onChange={setDate} inputType='date' />
+            <ColumnFilterControl label='Lista' value={formKey} onChange={setFormKey} options={[{value:'',label:'Todas as listas'},...FORM_DEFS.map(form=>({value:form.key,label:form.title}))]} />
+            <ColumnFilterControl label='Situação' value={status} onChange={value=>setStatus((value || 'all') as ListStatusFilter)} options={[{value:'all',label:'Todas as situações'},...Object.entries(statusLabel).map(([value,label])=>({value,label}))]} />
+            <Button variant='ghost' size='sm' onClick={()=>{setEventId('');setDate('');setFormKey('');setStatus('all')}}>Limpar filtros</Button>
           </div>
           <div className='verdant-table-wrap'>
             <table className='verdant-table'>
-              <thead><tr><th>Data</th><th>Evento</th><th>Lista</th><th>Horário</th><th>Situação</th><th>Ações</th></tr></thead>
+              <thead><tr>{([['date','Data'],['event','Evento'],['list','Lista']] as const).map(([key,label])=><SortableTableHeader key={key} label={label} active={sortKey===key} direction={direction} onClick={()=>toggleSort(key)}/>)}<th>Horário</th><SortableTableHeader label='Situação' active={sortKey==='status'} direction={direction} onClick={()=>toggleSort('status')}/><th>Ações</th></tr></thead>
               <tbody>{rows.map(({ config, event, status: rowStatus }) => <tr key={config.id}>
                 <td data-label='Data'>{event ? compactDate(event.date) : '—'}</td>
                 <td data-label='Evento'>{event?.name || 'Evento indisponível'}</td>
@@ -1193,14 +1197,18 @@ function RegistrationsPage({
     const requested = new URLSearchParams(window.location.search).get('form')
     return FORM_DEFS.some((form) => form.key === requested) ? requested! : ''
   })
+  const [professional, setProfessional] = useState('')
+  const [from, setFrom] = useState('')
+  const [to, setTo] = useState('')
   const [consent, setConsent] = useState('')
   const [sortKey, setSortKey] = useState<RegistrationSortKey>('name')
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
-  const filtered = visibleRegistrations(data).filter((row) => {
+  const sourceRegistrations = eventId ? data.registrations.filter(row=>row.eventId===eventId) : visibleRegistrations(data)
+  const filtered = sourceRegistrations.filter((row) => {
     const search = `${row.name} ${row.whatsapp} ${row.email} ${row.eventName} ${row.optionName}`.toLowerCase()
     const matchesConsent = !consent
       || (consent === 'sem-resposta' ? row.consentAnswered === false : row.consentAnswered !== false && row.consent === (consent === 'sim'))
-    return (!query || search.includes(query.toLowerCase())) && (!eventId || row.eventId === eventId) && (!formKey || row.formKey === formKey) && matchesConsent
+    return (!query || search.includes(query.toLowerCase())) && (!eventId || row.eventId === eventId) && (!formKey || row.formKey === formKey) && matchesConsent && (!professional || (row.optionName || '').toLocaleLowerCase().includes(professional.toLocaleLowerCase())) && (!from || new Intl.DateTimeFormat('sv-SE',{timeZone:'America/Sao_Paulo'}).format(new Date(row.createdAt)) >= from) && (!to || new Intl.DateTimeFormat('sv-SE',{timeZone:'America/Sao_Paulo'}).format(new Date(row.createdAt)) <= to)
   })
   const sorted = sortRows(filtered, (row) => {
     if (sortKey === 'optionName') return row.optionName || row.profileType
@@ -1220,7 +1228,16 @@ function RegistrationsPage({
       <Card>
         <CardContent className='pt-6'>
           <div className='mb-4'><h2 className='font-semibold'>{<LocalizedText text={"Inscrições dos formulários"} />}</h2><p className='mt-1 text-sm text-muted-foreground'>{<LocalizedText text={"Respostas novas recebidas nos cinco formulários."} />}</p></div>
-          <div className='verdant-table-filters'><label className='verdant-search-field'><Search size={16} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={getCurrentLanguage() === 'en' ? 'Search name, WhatsApp, email, or event' : 'Buscar nome, WhatsApp, e-mail ou evento'} /></label><select value={eventId} onChange={(e) => setEventId(e.target.value)}><option value=''>{<LocalizedText text={"Todos os eventos"} />}</option>{data.events.slice().sort((a, b) => a.date.localeCompare(b.date) || a.name.localeCompare(b.name, 'pt-BR')).map((event) => <option key={event.id} value={event.id}>{compactDate(event.date)} · {event.name}</option>)}</select><select value={formKey} onChange={(e) => setFormKey(e.target.value)}><option value=''>{<LocalizedText text={"Todas as listas"} />}</option>{FORM_DEFS.map((form) => <option key={form.key} value={form.key}><LocalizedText text={form.title} /></option>)}</select><select value={consent} onChange={(e) => setConsent(e.target.value)}><option value=''>{<LocalizedText text={"Todos os consentimentos"} />}</option><option value='sim'>{<LocalizedText text={"Aceitou novidades"} />}</option><option value='nao'>{<LocalizedText text={"Não aceitou"} />}</option><option value='sem-resposta'>{<LocalizedText text={"Sem resposta"} />}</option></select></div>
+          <div className='verdant-column-filter-bar'>
+            <ColumnFilterControl label='Nome / contato' value={query} onChange={setQuery} placeholder='Buscar nome, WhatsApp ou e-mail' />
+            <ColumnFilterControl label='Evento' value={eventId} onChange={setEventId} options={[{value:'',label:'Todos os eventos'},...data.events.slice().sort((a,b)=>a.date.localeCompare(b.date)).map(event=>({value:event.id,label:`${compactDate(event.date)} · ${event.name}`}))]} />
+            <ColumnFilterControl label='Lista' value={formKey} onChange={setFormKey} options={[{value:'',label:'Todas as listas'},...FORM_DEFS.map(form=>({value:form.key,label:form.title}))]} />
+            <ColumnFilterControl label='Profissional' value={professional} onChange={setProfessional} />
+            <ColumnFilterControl label='Recebido de' value={from} onChange={setFrom} inputType='date' />
+            <ColumnFilterControl label='Recebido até' value={to} onChange={setTo} inputType='date' />
+            <ColumnFilterControl label='Consentimento' value={consent} onChange={setConsent} options={[{value:'',label:'Todos os consentimentos'},{value:'sim',label:'Aceitou novidades'},{value:'nao',label:'Não aceitou'},{value:'sem-resposta',label:'Sem resposta'}]} />
+            <Button size='sm' variant='ghost' onClick={()=>{setQuery('');setEventId('');setFormKey('');setProfessional('');setFrom('');setTo('');setConsent('')}}>Limpar filtros</Button>
+          </div>
                     {groups.map((group) => <details className='verdant-registration-group' key={group.id} open={groups.length === 1}><summary><b>{group.date ? `${compactDate(group.date)} · ` : ''}{group.name}</b> <small>{group.rows.length} {getCurrentLanguage() === 'en' ? 'registrations' : 'inscrições'} · {FORM_DEFS.map((form) => ({ title: form.title, total: group.rows.filter((row) => row.formKey === form.key).length })).filter((item) => item.total).map((item) => `${item.title.replace(/^Lista (de )?/, '').replace(/ Verdant$/, '')}: ${item.total}`).join(' · ')}</small></summary><div className='verdant-table-wrap'><table className='verdant-table'>
             <thead><tr>
               <SortableTableHeader label={<LocalizedText text='Nome' />} active={sortKey === 'name'} direction={sortDirection} onClick={() => toggleSort('name')} />
@@ -1743,7 +1760,9 @@ export function VerdantReports({ data, embedded = false }: { data: VerdantState;
   const admin = useAuthStore(state => state.auth.user?.role.includes('admin'))
   const [eventId, setEventId] = useState(() => new URLSearchParams(window.location.search).get('event') || data.events.find((event) => event.active)?.id || '')
   const [lineSort, setLineSort] = useState<'order' | 'time'>('order')
+  const [lineTrack, setLineTrack] = useState('')
   const lineRows = djLineRows(data, eventId, lineSort)
+  const printableLine = lineRows.filter(row=>!lineTrack || row.track.toUpperCase()===lineTrack)
   const [pdfBusy, setPdfBusy] = useState(false)
   const [pdfDownload, setPdfDownload] = useState<{ url: string; filename: string; eventId: string; label: string } | null>(null)
   const autoGenerateRef = useRef(false)
@@ -1766,9 +1785,9 @@ export function VerdantReports({ data, embedded = false }: { data: VerdantState;
       if (kind === 'djs' || kind === 'influencers') {
         const formKey = kind === 'djs' ? 'DJS' : 'INFLUENCIADORES'
         const professionals = kind === 'djs' ? djRows : influencerRows
-        reportSections = professionalDoorList(kind === 'djs' ? 'DJs' : 'Influencers', kind === 'djs' ? lineRows.map(row => row.name) : professionals.map(({ person }) => person.name), kind === 'djs' ? djGuests(data, eventId).map(row => ({ professional: row.professional, name: row.name })) : visibleRegistrations(data).filter(row => row.eventId === eventId && row.formKey === formKey).map(row => ({ professional: row.optionName || '', name: row.name })))
+        reportSections = professionalDoorList(kind === 'djs' ? 'DJs' : 'Influencers', kind === 'djs' ? [...new Set([...lineRows.map(row => row.name), ...djGuests(data, eventId).map(row=>row.professional)])] : professionals.map(({ person }) => person.name), kind === 'djs' ? djGuests(data, eventId).map(row => ({ professional: row.professional, name: row.name })) : visibleRegistrations(data).filter(row => row.eventId === eventId && row.formKey === formKey).map(row => ({ professional: row.optionName || '', name: row.name })))
       } else if (kind === 'line') {
-        reportSections = djLineSections(lineRows)
+        reportSections = djLineSections(printableLine)
       } else if (kind === 'leads') {
         reportSections = leads.length ? [{ title: 'Contatos com consentimento', groups: leads.map(row => ({ label: row.name, names: [row.whatsapp, row.email].filter(Boolean) })) }] : []
       } else if (kind === 'geral') {
@@ -1849,7 +1868,7 @@ export function VerdantReports({ data, embedded = false }: { data: VerdantState;
         <ReportExportCard icon={<FileSpreadsheet size={18} />} title='Lista geral (todos os eventos)' description='Todas as inscrições de todos os eventos ativos, em um único CSV.' count={visibleRegistrations(data).length} countLabel='inscrições'         onPrint={() => { void downloadReportPdf('geral') }} disabled={pdfBusy} onCsv={exportGeneral} />
         <ReportExportCard icon={<FileSpreadsheet size={18} />} title='Leads com consentimento' description='Contatos que aceitaram novidades: nome, WhatsApp e e-mail.' count={leads.length} countLabel='contatos autorizados' onPrint={() => { void downloadReportPdf('leads') }} onCsv={exportLeads} disabled={!event || pdfBusy} />
         <ReportExportCard icon={<Music2 size={18} />} title='Lista de DJs' description='Inscritos agrupados pelo DJ, também incluídos no relatório geral. PDF e CSV de convidados.' count={djGuests(data, eventId).length} countLabel='inscritos vinculados aos DJs' onPrint={() => { void downloadReportPdf('djs') }} onCsv={() => exportPeople('DJ')} disabled={!event || pdfBusy} />
-        <Card className='verdant-export-card'><CardHeader><CardTitle>Line de DJs</CardTitle><CardDescription>Escala da noite por pista, com ordem e horários. Os inscritos ficam na Lista de DJs e no relatório geral.</CardDescription></CardHeader><CardContent><label className='verdant-field'>Organizar impressão<select value={lineSort} onChange={e => setLineSort(e.target.value as 'order' | 'time')}><option value='order'>Ordem 1, 2, 3… por pista</option><option value='time'>Horário da noite por pista</option></select></label><div className='verdant-export-actions'><Button disabled={!event || pdfBusy || !lineRows.length} onClick={() => void downloadReportPdf('line')}>Gerar PDF da line</Button><Button variant='outline' disabled={!event || !lineRows.length} onClick={() => csvDownload(`verdant-line-djs-${event?.date || 'evento'}.csv`, [['Data', 'Evento', 'Pista', 'Ordem', 'DJ', 'Horário'], ...lineRows.map(row => [event?.date || '', event?.name || '', row.track, String(row.order), row.name, row.time])])}>Exportar CSV da line</Button></div></CardContent></Card>
+        <Card className='verdant-export-card'><CardHeader><CardTitle>Line de DJs</CardTitle><CardDescription>Escala da noite por pista, com ordem e horários. Os inscritos ficam na Lista de DJs e no relatório geral.</CardDescription></CardHeader><CardContent><label className='verdant-field'>Pista<select value={lineTrack} onChange={e=>setLineTrack(e.target.value)}><option value=''>Todas as pistas</option><option>SKY</option><option>LAND</option></select></label><label className='verdant-field'>Organizar impressão<select value={lineSort} onChange={e => setLineSort(e.target.value as 'order' | 'time')}><option value='order'>Ordem 1, 2, 3… por pista</option><option value='time'>Horário da noite por pista</option></select></label><div className='verdant-export-actions'><Button disabled={!event || pdfBusy || !printableLine.length} onClick={() => void downloadReportPdf('line')}>Gerar PDF da line</Button><Button variant='outline' disabled={!event || !printableLine.length} onClick={() => csvDownload(`verdant-line-djs-${event?.date || 'evento'}.csv`, [['Data', 'Evento', 'Pista', 'Ordem', 'DJ', 'Primeiro horário', 'Segundo horário'], ...printableLine.map(row => [event?.date || '', event?.name || '', row.track, String(row.order), row.name, row.time, row.secondTime || ''])])}>Exportar CSV da line</Button></div></CardContent></Card>
         <ReportExportCard icon={<Megaphone size={18} />} title='Lista de Influencers' description='PDF com os nomes dos Influencers e seus convidados, agrupados por profissional.' count={influencerRows.length} countLabel='Influencers vinculados' onPrint={() => { void downloadReportPdf('influencers') }} onCsv={() => exportPeople('INFLUENCIADORES')} disabled={!event || pdfBusy} />
       </div>
       {admin && <InfluencerPayoutReportPanel eventId={eventId || undefined} />}
