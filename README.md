@@ -64,6 +64,35 @@ Hospedagem apenas estática (por exemplo, publicar `dist/` em um CDN sem iniciar
 
 As áreas Google Analytics e Meta/Instagram informam que ainda não há conexão e não exibem métricas de demonstração. Para ativá-las, será necessário configurar credenciais e permissões aprovadas para as contas correspondentes.
 
+### Zig (etapa 1: conexão e prévia, somente leitura)
+
+Na tela **Apps** (somente administradores; permissão `zig:manage`, validada no servidor em `/api/admin/zig/*`), é possível conectar à API da Zig e gerar uma prévia do cruzamento de clientes com as listas existentes. Esta etapa faz apenas consultas `GET`, não grava clientes importados, não cria lançamentos no Financeiro, não mexe em bônus/pagamentos e não tem sincronização agendada.
+
+Configuração privada:
+
+- `VERDANT_INTEGRATION_ENCRYPTION_KEY` é obrigatória no servidor; sem ela o token não é salvo.
+- O token de integração é informado só pela tela, fica criptografado no servidor e nunca é devolvido pela API, exibido, registrado em logs ou versionado. Ele é enviado cru no header `Authorization` (sem `Bearer`).
+- A URL base é fixa (`https://api.zigcore.com.br/integration`) e não pode ser alterada. `VERDANT_ZIG_TEST_BASE_URL` só vale com `NODE_ENV=test` (testes automatizados).
+
+Pendente de configuração (valores ainda desconhecidos, nada é presumido): token, identificador da rede e loja Verdant. A tela mostra o que falta; depois de salvar token e rede, use **Testar conexão** e **Listar lojas da rede** para escolher a loja.
+
+Roteiro de teste com um evento encerrado:
+
+1. Salve token e rede, teste a conexão e selecione a loja.
+2. Gere a prévia com as datas de um evento já encerrado (até 14 dias; no máximo 5 eventos).
+3. Confira os grupos: vínculo encontrado, cliente novo, divergência e comandas de mesa, além dos campos vazios que a Zig poderia preencher (documento, e-mail, nascimento; documentos aparecem mascarados).
+4. Confirme que Clientes, listas e Financeiro permanecem inalterados.
+
+Premissas (também exibidas na prévia): o `id` do check-in é o userId da Zig, não um identificador único de presença; os check-ins são buscados em janelas de até 5 dias, 50 por página, e qualquer falha interrompe a prévia (nunca há sucesso parcial).
+
+Associação check-in/compra ↔ evento (**provisória**, a confirmar com a Zig): como o check-in não traz `eventId`, o registro é associado pelo horário, de 4 h antes a 16 h após o início do evento, respeitando a virada da meia-noite. Só conta como presença o registro associado a **um único evento do período pedido**. Ficam separados em **Presença não confirmada**, sem entrar no cruzamento nem contar como presença: registros fora da janela de qualquer evento e registros compatíveis com mais de um evento (ex.: eventos consecutivos com início próximo). Registros associados a eventos vizinhos (noite anterior ou dias seguintes) são descartados e apenas contados, para não incluir pessoas de outro evento.
+
+Datas consultadas: eventos de 1 dia antes até 2 dias depois do período (contexto para separar noites consecutivas); check-ins de `dtinicio` até `dtfim`+2 (a Zig não documenta se `dtfim` é inclusivo; janelas se sobrepõem em 1 dia e duplicados são removidos); compradores até `dtfim`+1 para cobrir a madrugada, desde que o limite de 5 eventos por consulta seja respeitado — se houver evento no dia seguinte que estoure o limite, a consulta usa só `dtfim` e a prévia avisa que compras da madrugada podem faltar.
+
+Erros da Zig: as mensagens mostradas são sempre locais (por status HTTP); o corpo bruto da resposta nunca é lido nem repassado, pois pode ecoar o token, inclusive truncado.
+
+Nome sozinho nunca unifica cadastros; telefone compartilhado, homônimos, documentos conflitantes e múltiplas correspondências ficam para conferência. Próxima etapa: gravar vínculos (ID Zig) e dados complementares após aprovação da prévia.
+
 ## Verificações
 
 ```bash

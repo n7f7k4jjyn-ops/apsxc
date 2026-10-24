@@ -21,6 +21,7 @@ import { ThemeSwitch } from '@/components/theme-switch'
 import { LocalizedText, useLanguage } from '@/context/language-provider'
 import { useAuthStore } from '@/stores/auth-store'
 import { apps } from './data/apps'
+import { ZigIntegration } from './zig-integration'
 
 const route = getRouteApi('/_authenticated/apps/')
 
@@ -207,6 +208,10 @@ export function Apps() {
             {settingsError && <p role='alert' className='text-sm text-destructive'>{settingsError}</p>}
             <Button type='submit' disabled={settingsSaving}>{settingsSaving ? translate('Salvando…') : translate('Salvar configurações')}</Button>
           </form>}
+        </details>}
+        {isAdmin && <details id='zig' className='rounded-lg border p-4'>
+          <summary className='cursor-pointer font-semibold'>Zig: conexão e prévia de clientes (somente consulta)</summary>
+          <div className='mt-4'><ZigIntegration /></div>
         </details>}
         {!isAdmin && <p role='status' className='text-xs text-muted-foreground'><LocalizedText text='A configuração de integrações está disponível somente para administradores.' /></p>}
         <div className='my-4 flex items-end justify-between sm:my-0 sm:items-center'>
