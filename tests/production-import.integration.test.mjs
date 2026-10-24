@@ -79,6 +79,12 @@ test('production import through authenticated APIs: backup, partial recovery, li
       await page.getByRole('status').filter({ hasText: 'Concluído:' }).waitFor({ timeout: 60000 })
       await page.getByRole('button', { name: 'Gerar nova prévia' }).click()
       await page.getByText(/0 DJs novos.*0 lançamentos/).waitFor()
+      await page.getByRole('button', { name: 'Gerar relatório de repasse de influencers' }).click()
+      await page.getByRole('button', { name: 'Baixar PDF para imprimir' }).waitFor()
+      const reportDownload = page.waitForEvent('download')
+      await page.getByRole('button', { name: 'Baixar PDF para imprimir' }).click()
+      const reportFile = await (await reportDownload).path()
+      assert.ok(reportFile && (await stat(reportFile)).size > 500)
       await page.setViewportSize({ width: 390, height: 844 })
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true, 'Financeiro não deve transbordar no celular.')
     } else {

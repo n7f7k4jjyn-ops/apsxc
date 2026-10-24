@@ -1,5 +1,7 @@
 import { RostersPage } from './rosters'
 import { FinancePage } from './finance'
+import { useAuthStore } from '@/stores/auth-store'
+import { InfluencerPayoutReportPanel } from './influencer-payout-report-panel'
 import { birthdayDoorGroup, birthdayGuestNames } from './birthday-guests'
 import { professionalDoorList } from './professional-door-list'
 import { djLineRows, djLineSections, djGuests } from './dj-line'
@@ -1793,6 +1795,7 @@ function reportPeople(data: VerdantState, kind: Person['kind']) {
 }
 
 export function VerdantReports({ data, embedded = false }: { data: VerdantState; embedded?: boolean }) {
+  const admin = useAuthStore(state => state.auth.user?.role.includes('admin'))
   const [eventId, setEventId] = useState(() => new URLSearchParams(window.location.search).get('event') || data.events.find((event) => event.active)?.id || '')
   const [lineSort, setLineSort] = useState<'order' | 'time'>('order')
   const lineRows = djLineRows(data, eventId, lineSort)
@@ -1904,6 +1907,7 @@ export function VerdantReports({ data, embedded = false }: { data: VerdantState;
         <Card className='verdant-export-card'><CardHeader><CardTitle>Line de DJs</CardTitle><CardDescription>Escala da noite por pista, com ordem e horários. Os inscritos ficam na Lista de DJs e no relatório geral.</CardDescription></CardHeader><CardContent><label className='verdant-field'>Organizar impressão<select value={lineSort} onChange={e => setLineSort(e.target.value as 'order' | 'time')}><option value='order'>Ordem 1, 2, 3… por pista</option><option value='time'>Horário da noite por pista</option></select></label><div className='verdant-export-actions'><Button disabled={!event || pdfBusy || !lineRows.length} onClick={() => void downloadReportPdf('line')}>Gerar PDF da line</Button><Button variant='outline' disabled={!event || !lineRows.length} onClick={() => csvDownload(`verdant-line-djs-${event?.date || 'evento'}.csv`, [['Data', 'Evento', 'Pista', 'Ordem', 'DJ', 'Horário'], ...lineRows.map(row => [event?.date || '', event?.name || '', row.track, String(row.order), row.name, row.time])])}>Exportar CSV da line</Button></div></CardContent></Card>
         <ReportExportCard icon={<Megaphone size={18} />} title='Lista de Influencers' description='PDF com os nomes dos Influencers e seus convidados, agrupados por profissional.' count={influencerRows.length} countLabel='Influencers vinculados' onPrint={() => { void downloadReportPdf('influencers') }} onCsv={() => exportPeople('INFLUENCIADORES')} disabled={!event || pdfBusy} />
       </div>
+      {admin && <InfluencerPayoutReportPanel eventId={eventId || undefined} />}
       {pdfDownload?.eventId === eventId && <a className='mt-3 inline-flex min-h-11 items-center text-sm underline' href={pdfDownload.url} download={pdfDownload.filename}>Baixar PDF — {pdfDownload.label}</a>}
 
     </>
