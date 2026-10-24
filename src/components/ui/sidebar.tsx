@@ -202,7 +202,7 @@ function Sidebar({
             target?.focus({ preventScroll: true })
           }}
           onKeyDown={(event) => {
-            if (event.key === 'Escape' && !event.defaultPrevented) setOpenMobile(false)
+            if (event.key === 'Escape') setOpenMobile(false)
           }}
           style={
             {

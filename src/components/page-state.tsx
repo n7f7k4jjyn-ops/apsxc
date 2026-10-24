@@ -4,6 +4,26 @@ import { LocalizedText } from '@/context/language-provider'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 
+export function PageDataState({
+  ready,
+  connected,
+  retry,
+  children,
+}: {
+  ready: boolean
+  connected: boolean
+  retry: () => void
+  children: React.ReactNode
+}) {
+  if (!ready) return <PageLoading />
+  return (
+    <>
+      {!connected && <PageError retry={retry} />}
+      {children}
+    </>
+  )
+}
+
 export function PageLoading() {
   return (
     <div

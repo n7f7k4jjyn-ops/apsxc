@@ -41,7 +41,15 @@ describe('mobile navigation drawer', () => {
     await expect
       .element(screen.getByRole('link', { name: 'Agenda' }))
       .toHaveFocus()
-    await userEvent.keyboard('{Escape}')
+    const preventEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') event.preventDefault()
+    }
+    document.addEventListener('keydown', preventEscape, true)
+    try {
+      await userEvent.keyboard('{Escape}')
+    } finally {
+      document.removeEventListener('keydown', preventEscape, true)
+    }
     await expect.element(screen.getByRole('dialog')).not.toBeInTheDocument()
     await expect.element(trigger).toHaveAttribute('aria-expanded', 'false')
     await expect.element(trigger).toHaveFocus()
