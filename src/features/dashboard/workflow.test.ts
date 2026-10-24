@@ -119,3 +119,13 @@ describe('resumo operacional', () => {
     ).toHaveLength(29)
   })
 })
+
+
+describe('intervalo personalizado', () => {
+  it('inclui os dois extremos e a virada do mês', () => {
+    expect(periodKeys(Date.parse('2026-10-24T12:00:00Z'), 'week', { from: '2026-09-30', to: '2026-10-02' })).toEqual(['2026-09-30', '2026-10-01', '2026-10-02'])
+  })
+  it('rejeita datas inválidas, intervalo incompleto e ordem invertida', () => {
+    for (const range of [{ from: '', to: '2026-10-24' }, { from: '2026-02-30', to: '2026-03-01' }, { from: '2026-10-25', to: '2026-10-24' }]) expect(() => periodKeys(Date.now(), 'day', range)).toThrow()
+  })
+})

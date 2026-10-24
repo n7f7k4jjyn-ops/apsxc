@@ -11,30 +11,37 @@ import {
 } from '@/features/verdant/finance-data'
 import { useVerdantStore } from '@/features/verdant/store'
 import { ZigEventSummary } from '@/features/verdant/zig-event-summary'
-import { buildWorkflow, periodKeys, type Period } from './workflow'
+import {
+  buildWorkflow,
+  periodKeys,
+  type Period,
+  type DateRange,
+} from './workflow'
 
 export function FinancialSummary({
   summarySwitch,
   period,
   focusId,
   now,
+  range,
 }: {
   summarySwitch: ReactNode
   period: Period
   focusId: string
   now: number
+  range?: DateRange
 }) {
   const [data, setData] = useState<FinanceData>()
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(true)
   const operation = useVerdantStore((state) => state.data)
   const connected = useVerdantStore((state) => state.serverConnected)
-  const workflow = buildWorkflow(operation, now, period, focusId)
-  const keys = periodKeys(now, period)
+  const workflow = buildWorkflow(operation, now, period, focusId, range)
+  const keys = periodKeys(now, period, range)
   const from = keys[0],
     to = keys[keys.length - 1]
   const eventId = workflow.event?.id || ''
-  const activeIdsKey = JSON.stringify(workflow.events.map((e) => e.id))
+
   const [refresh, setRefresh] = useState(0)
   useEffect(() => {
     const controller = new AbortController()
@@ -68,21 +75,35 @@ export function FinancialSummary({
       return null
     try {
       return {
-        report: financeReport(
-          data.entries.filter(
-            (entry) =>
-              focusId !== 'all' ||
-              (JSON.parse(activeIdsKey) as string[]).includes(entry.eventId)
-          ),
-          { from, to, eventId }
-        ),
+        report: financeReport(data.entries, { from, to, eventId }),
         error: '',
       }
     } catch (e) {
       return { report: null, error: (e as Error).message }
     }
-  }, [data, busy, connected, focusId, from, to, eventId, activeIdsKey])
+  }, [data, busy, connected, focusId, from, to, eventId])
   const report = result?.report
+  const previousTo = new Date(Date.parse(from + 'T12:00:00Z') - 86400000)
+    .toISOString()
+    .slice(0, 10)
+  const previousFrom = new Date(
+    Date.parse(from + 'T12:00:00Z') - keys.length * 86400000
+  )
+    .toISOString()
+    .slice(0, 10)
+  const previous = (() => {
+    try {
+      return report && data
+        ? financeReport(data.entries, {
+            from: previousFrom,
+            to: previousTo,
+            eventId,
+          })
+        : undefined
+    } catch {
+      return undefined
+    }
+  })()
   const influencer =
     report?.cash
       .filter((e) => e.type === 'payable' && e.category === 'influencer')
@@ -146,24 +167,33 @@ export function FinancialSummary({
         {(error || result?.error) && (
           <p role='alert'>{error || result?.error}</p>
         )}
+        <h3 className='text-lg font-semibold'>Público e listas</h3>
         {connected && (
           <div className='grid gap-3 sm:grid-cols-2'>
             <Card>
               <CardHeader>
-                <CardTitle>Inscritos no evento em foco</CardTitle>
+                <CardTitle>
+                  {eventId
+                    ? 'Inscritos no evento em foco'
+                    : 'Inscritos dos eventos ativos'}
+                </CardTitle>
               </CardHeader>
-              <CardContent>{workflow.registrations.length}</CardContent>
+              <CardContent className='text-2xl font-semibold'>
+                {workflow.registrations.length}
+              </CardContent>
             </Card>
             <Card>
               <CardHeader>
                 <CardTitle>Inscrições recebidas no período</CardTitle>
               </CardHeader>
-              <CardContent>{workflow.received}</CardContent>
+              <CardContent className='text-2xl font-semibold'>
+                {workflow.received}
+              </CardContent>
             </Card>
           </div>
         )}
-        <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-3'>
-          {figures.map(([label, value]) => (
+        {report && ([['Receitas, despesas e pendências', figures.slice(0, 6)], ['Pagamentos por categoria', figures.slice(6)]] as const).map(([title, items]) => <section key={title} className='space-y-3'><h3 className='text-lg font-semibold'>{title}</h3><div className='grid gap-3 sm:grid-cols-2 xl:grid-cols-3'>
+          {items.map(([label, value]) => (
             <Card key={label}>
               <CardHeader>
                 <CardTitle className='text-sm'>{label}</CardTitle>
@@ -173,18 +203,59 @@ export function FinancialSummary({
               </CardContent>
             </Card>
           ))}
-        </div>
+</div></section>)}
+        {report && previous && (
+          <Card className='space-y-3 p-4'>
+            <h3 className='text-lg font-semibold'>Comparação entre períodos</h3>
+            <p>
+              Atual: {from.split('-').reverse().join('/')} a {to.split('-').reverse().join('/')} · Anterior: {previousFrom.split('-').reverse().join('/')} a {previousTo.split('-').reverse().join('/')} ·
+              Mesmo filtro de evento, intervalos com {keys.length} dias.
+            </p>
+            <p className='text-sm text-muted-foreground'>
+              Pendências usam a situação atual e o vencimento; não reconstituem
+              o saldo pendente de uma data passada.
+            </p>
+            <div className='overflow-x-auto'>
+              <table className='w-full text-sm'>
+                <thead>
+                  <tr>
+                    <th>Indicador</th>
+                    <th>Anterior</th>
+                    <th>Atual</th>
+                    <th>Variação</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(
+                    [
+                      ['Recebimentos', previous.incoming, report.incoming],
+                      ['Pagamentos', previous.outgoing, report.outgoing],
+                      ['Pendente a pagar', previous.payable, report.payable],
+                      [
+                        'Pendente a receber',
+                        previous.receivable,
+                        report.receivable,
+                      ],
+                    ] as const
+                  ).map(([label, before, after]) => (
+                    <tr key={label}>
+                      <td>{label}</td>
+                      <td>{formatCents(before)}</td>
+                      <td>{formatCents(after)}</td>
+                      <td>{formatCents(after - before)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        )}
         {connected && (focusId === 'all' || eventId) && (
           <ZigEventSummary
             key={refresh}
             from={from}
             to={to}
             eventId={eventId}
-            eventIds={
-              focusId === 'all'
-                ? (JSON.parse(activeIdsKey) as string[])
-                : undefined
-            }
           />
         )}
         <Button asChild variant='outline'>

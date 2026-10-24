@@ -1,3 +1,4 @@
+import { SortButton } from './list-controls'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { useAuthStore } from '@/stores/auth-store'
@@ -192,22 +193,7 @@ export function RegistryPage({
   function sortHeader(key: string, text: string) {
     if (category === 'clients') return text
     const active = sort === key
-    return (
-      <button
-        type='button'
-        className='registry-sort'
-        aria-label={`Ordenar por ${text}`}
-        aria-sort={active ? (dir === 'asc' ? 'ascending' : 'descending') : 'none'}
-        onClick={() => {
-          setDir(active && dir === 'asc' ? 'desc' : 'asc')
-          setSort(key)
-          setPage(0)
-        }}
-      >
-        {text}
-        <span aria-hidden='true'>{active ? (dir === 'asc' ? ' ▲' : ' ▼') : ' ⇅'}</span>
-      </button>
-    )
+    return <SortButton label={text} active={active} direction={dir} onClick={() => { setDir(active && dir === 'asc' ? 'desc' : 'asc'); setSort(key); setPage(0) }} />
   }  function choose(value: Category) {
     void navigate({ to: '/verdant/cadastros', search: { category: value } })
     setPage(0)

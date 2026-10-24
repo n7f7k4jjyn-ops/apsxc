@@ -40,7 +40,7 @@ import { ThemeSwitch } from '@/components/theme-switch'
 import { formatDate, type FormKey } from '@/features/verdant/data'
 import { useVerdantStore } from '@/features/verdant/store'
 import './mobile.css'
-import { buildWorkflow, timeZone, type Period } from './workflow'
+import { buildWorkflow, periodKeys, timeZone, type Period, type DateRange } from './workflow'
 
 const slug: Record<FormKey, string> = {
   DJS: 'djs',
@@ -75,23 +75,30 @@ export function Dashboard() {
   const [now, setNow] = useState(Date.now)
   useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 30000); return () => window.clearInterval(timer) }, [])
   const [period, setPeriod] = useState<Period>('week')
-  const [focusId, setFocusId] = useState('next')
+  const [focusId, setFocusId] = useState('all')
+  const [customRange, setCustomRange] = useState<DateRange>({ from: '', to: '' })
+  const [rangeActive, setRangeActive] = useState(false)
+  let rangeError = ''
+  if (rangeActive) { try { periodKeys(now, period, customRange) } catch (error) { rangeError = (error as Error).message } }
+  const range = rangeActive && !rangeError ? customRange : undefined
   useEffect(() => { void initialize() }, [initialize])
-  const workflow = buildWorkflow(data, now, period, focusId)
   const summarySwitch = <>
     <nav aria-label='Tipo de resumo' className='flex flex-wrap gap-2'>
       <Button variant={summary === 'operation' ? 'default' : 'outline'} aria-pressed={summary === 'operation'} onClick={() => setSummary('operation')}>Resumo da operação</Button>
       {admin && <Button variant={summary === 'finance' ? 'default' : 'outline'} aria-pressed={summary === 'finance'} onClick={() => setSummary('finance')}>Resumo financeiro</Button>}
     </nav>
     <div className='summary-filters flex flex-wrap items-end gap-3 rounded-xl border p-3'>
-      <label className='grid min-w-0 flex-1 gap-1 text-sm'>Evento em foco<select className='h-11 rounded-md border bg-background px-3' value={focusId} onChange={e => setFocusId(e.target.value)}><option value='next'>Próximo evento</option><option value='all'>Todos os eventos ativos</option>{workflow.events.map(event => <option key={event.id} value={event.id}>{event.date.split('-').reverse().join('/')} · {event.name}</option>)}</select></label>
-      <div><p className='mb-1 text-sm'>Período</p><div className='flex gap-1'>{(['day', 'week', 'month'] as const).map(value => <Button key={value} size='sm' variant={period === value ? 'secondary' : 'ghost'} aria-pressed={period === value} onClick={() => setPeriod(value)}>{{day:'Hoje', week:'Esta semana', month:'Este mês'}[value]}</Button>)}</div></div>
+      <label className='grid min-w-0 flex-1 gap-1 text-sm'>Evento em foco<select className='h-11 rounded-md border bg-background px-3' value={focusId} onChange={e => setFocusId(e.target.value)}><option value='next'>Próximo evento</option><option value='all'>Todos os eventos</option>{[...data.events].sort((a, b) => a.date.localeCompare(b.date) || a.name.localeCompare(b.name)).map(event => <option key={event.id} value={event.id}>{event.date.split('-').reverse().join('/')} · {event.name}</option>)}</select></label>
+      <div><p className='mb-1 text-sm'>Período</p><div className='flex gap-1'>{(['day', 'week', 'month'] as const).map(value => <Button key={value} size='sm' variant={!rangeActive && period === value ? 'secondary' : 'ghost'} aria-pressed={!rangeActive && period === value} onClick={() => { setPeriod(value); setRangeActive(false) }}>{{day:'Hoje', week:'Esta semana', month:'Este mês'}[value]}</Button>)}</div></div>
+      <label className='grid gap-1 text-sm'>Data inicial<input className='h-11 rounded-md border bg-background px-3' type='date' value={rangeActive ? customRange.from : periodKeys(now, period)[0]} onChange={e => { setCustomRange(current => ({ from: e.target.value, to: rangeActive ? current.to : periodKeys(now, period)[periodKeys(now, period).length - 1] })); setRangeActive(true) }} /></label>
+      <label className='grid gap-1 text-sm'>Data final<input className='h-11 rounded-md border bg-background px-3' type='date' value={rangeActive ? customRange.to : periodKeys(now, period)[periodKeys(now, period).length - 1]} onChange={e => { setCustomRange(current => ({ from: rangeActive ? current.from : periodKeys(now, period)[0], to: e.target.value })); setRangeActive(true) }} /></label>
     </div>
   </>
-  return admin && summary === 'finance' ? <FinancialSummary summarySwitch={summarySwitch} period={period} focusId={focusId} now={now} /> : <OperationsDashboard summarySwitch={summarySwitch} period={period} focusId={focusId} />
+  if (rangeError) return <><Header fixed /><Main className='space-y-4'>{summarySwitch}<p role='alert'>{rangeError}</p></Main></>
+  return admin && summary === 'finance' ? <FinancialSummary summarySwitch={summarySwitch} period={period} focusId={focusId} now={now} range={range} /> : <OperationsDashboard summarySwitch={summarySwitch} period={period} focusId={focusId} range={range} />
 }
 
-function OperationsDashboard({ summarySwitch, period, focusId }: { summarySwitch: ReactNode; period: Period; focusId: string }) {
+function OperationsDashboard({ summarySwitch, period, focusId, range }: { summarySwitch: ReactNode; period: Period; focusId: string; range?: DateRange }) {
   const { translate } = useLanguage()
   const { data, ready, serverConnected, initialize, refresh } =
     useVerdantStore()
@@ -100,8 +107,8 @@ function OperationsDashboard({ summarySwitch, period, focusId }: { summarySwitch
   const [extraError, setExtraError] = useState('')
   const [refreshing, setRefreshing] = useState(false)
   const workflow = useMemo(
-    () => buildWorkflow(data, now, period, focusId),
-    [data, now, period, focusId]
+    () => buildWorkflow(data, now, period, focusId, range),
+    [data, now, period, focusId, range]
   )
   const recordsHref = workflow.event
     ? `/verdant/inscricoes?event=${encodeURIComponent(workflow.event.id)}`

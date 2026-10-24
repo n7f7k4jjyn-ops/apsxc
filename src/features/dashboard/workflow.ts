@@ -6,6 +6,7 @@ import {
 } from '@/features/verdant/data'
 
 export type Period = 'day' | 'week' | 'month'
+export type DateRange = { from: string; to: string }
 type ListStatus = 'open' | 'closed' | 'scheduled' | 'disabled' | 'invalid'
 export const timeZone = 'America/Sao_Paulo'
 const dateFormatter = new Intl.DateTimeFormat('en-CA', {
@@ -25,7 +26,21 @@ const shift = (key: string, amount: number) => {
   value.setUTCDate(value.getUTCDate() + amount)
   return value.toISOString().slice(0, 10)
 }
-export function periodKeys(now: number, period: Period) {
+export function periodKeys(now: number, period: Period, range?: DateRange) {
+  if (range) {
+    const valid = (value: string) =>
+      /^\d{4}-\d{2}-\d{2}$/.test(value) &&
+      Number.isFinite(Date.parse(value)) &&
+      new Date(value).toISOString().slice(0, 10) === value
+    if (!valid(range.from) || !valid(range.to) || range.from > range.to)
+      throw new Error(
+        'Informe data inicial e final válidas, em ordem cronológica.'
+      )
+    const days =
+      Math.round((Date.parse(range.to) - Date.parse(range.from)) / 86400000) + 1
+    if (days > 3660) throw new Error('Selecione um intervalo de até 10 anos.')
+    return Array.from({ length: days }, (_, i) => shift(range.from, i))
+  }
   const today = dateKey(now)
   if (period === 'day') return [today]
   const value = new Date(`${today}T12:00:00Z`)
@@ -45,7 +60,8 @@ export function buildWorkflow(
   data: VerdantState,
   now: number,
   period: Period,
-  focusId: string
+  focusId: string,
+  range?: DateRange
 ) {
   const today = dateKey(now)
   const events = data.events
@@ -57,15 +73,17 @@ export function buildWorkflow(
   const event =
     focusId === 'all'
       ? undefined
-      : (events.find((item) => item.id === focusId) ?? upcoming[0])
+      : (data.events.find((item) => item.id === focusId) ?? upcoming[0])
   const visible = visibleRegistrations(data)
   const registrations = event
-    ? visible.filter((row) => row.eventId === event.id)
+    ? (event.active ? visible : data.registrations).filter(
+        (row) => row.eventId === event.id
+      )
     : visible
-  const keys = periodKeys(now, period)
+  const keys = periodKeys(now, period, range)
   const keySet = new Set(keys)
   const buckets =
-    period === 'day'
+    period === 'day' && !range
       ? Array.from({ length: 24 }, (_, hour) => ({
           name: `${String(hour).padStart(2, '0')}h`,
           total: 0,
@@ -82,7 +100,9 @@ export function buildWorkflow(
     if (!keySet.has(key)) continue
     received++
     const index =
-      period === 'day' ? Number(hourFormatter.format(stamp)) : keys.indexOf(key)
+      period === 'day' && !range
+        ? Number(hourFormatter.format(stamp))
+        : keys.indexOf(key)
     buckets[index].total++
   }
   const configs = new Map(
