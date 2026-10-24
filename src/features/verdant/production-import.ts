@@ -52,6 +52,27 @@ const phone = (s: string) =>
 const eventKey = (date: string, name: string) =>
   `${date}|${normalizedName(name)}`
 
+// Remove display-only weekday/date prefixes; never match two different dates.
+export function productionEventName(name: string) {
+  const plain = normalizedName(name)
+    .replace(/\b\d{1,2}\/\d{1,2}\/\d{4}\b/g, '')
+    .replace(
+      /^(domingo|segunda|terca|quarta|quinta|sexta|sabado)(-feira)?\s*[·:—-]?\s*/,
+      ''
+    )
+    .replace(/[^a-z0-9 ]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  const aliases: Record<string, string> = {
+    'festa do pijama': 'pijama',
+    skyland: 'ascension',
+    'skyland ascension': 'ascension',
+    'terashima ascension': 'ascension',
+  }
+  return aliases[plain] || plain
+}
+export type ProductionEventBindings = Record<string, string>
+
 export function readProductionBundle(input: unknown): ProductionBundle {
   const b = input as ProductionBundle
   const string = (v: unknown, max = 500) =>
@@ -185,7 +206,9 @@ export function planProductionImport(
   bundle: ProductionBundle,
   state: VerdantState,
   team: ImportedTeam[],
-  finance: FinanceData
+  finance: FinanceData,
+  bindings: ProductionEventBindings = {},
+  createHistoricalEvents = false
 ) {
   const next = structuredClone(state)
   const issues: string[] = []
@@ -240,19 +263,45 @@ export function planProductionImport(
     if (!p.beneficiaryName) p.beneficiaryName = source.beneficiary
     mapped.set(source.id, p)
   }
+  const eventBindings: {
+    key: string
+    date: string
+    name: string
+    candidates: { id: string; name: string }[]
+  }[] = []
   const gigMap = new Map<string, Gig>()
   for (const gig of bundle.engagements) {
     gigMap.set(gig.id, gig)
     const key = eventKey(gig.date, gig.event)
     if (!eventIds.has(key)) {
       const lookup = eventKey(gig.date, gig.event || 'Programação histórica')
-      const matches = next.events.filter(
-        (e) => eventKey(e.date, e.name) === lookup
-      )
-      const different = state.events.filter(
-        (e) => e.date === gig.date && eventKey(e.date, e.name) !== lookup
-      )
-      if (matches.length > 1 || (!matches.length && different.length)) {
+      const sameDay = next.events.filter((e) => e.date === gig.date)
+      const selected = bindings[key]
+      if (selected && !sameDay.some((event) => event.id === selected))
+        throw new Error(
+          `Vínculo de evento inválido: ${gig.date} — ${gig.event}`
+        )
+      const matches = selected
+        ? sameDay.filter((event) => event.id === selected)
+        : sameDay.filter(
+            (e) =>
+              eventKey(e.date, e.name) === lookup ||
+              (productionEventName(gig.event) &&
+                productionEventName(e.name) === productionEventName(gig.event))
+          )
+      if (
+        matches.length > 1 ||
+        (!matches.length &&
+          !createHistoricalEvents &&
+          state.events.some((e) => e.date === gig.date))
+      ) {
+        if (!eventBindings.some((row) => row.key === key))
+          eventBindings.push({
+            key,
+            date: gig.date,
+            name: gig.event || 'Sem nome',
+            candidates: sameDay.map(({ id, name }) => ({ id, name })),
+          })
         issues.push(
           `Evento precisa de vínculo manual: ${gig.date} — ${gig.event || 'sem nome'}`
         )
@@ -282,10 +331,21 @@ export function planProductionImport(
         time: gig.time,
         order: gig.order,
       }
-    else if (p.eventDetails[eventId].track !== gig.track)
-      issues.push(
-        `Mais de uma pista para ${p.name} em ${gig.date}; conferir line-up.`
-      )
+    else {
+      const detail = p.eventDetails[eventId]
+      const key = (track: string) => normalizedName(track)
+      if (
+        key(detail.track) !== key(gig.track) &&
+        !(detail.additionalSets || []).some(
+          (set) => key(set.track) === key(gig.track)
+        )
+      ) {
+        detail.additionalSets = [
+          ...(detail.additionalSets || []),
+          { track: gig.track, time: gig.time, order: gig.order },
+        ]
+      }
+    }
   }
   const existing = new Set(finance.entries.map((e) => e.externalId))
   const entries: FinanceDraft[] = []
@@ -349,6 +409,7 @@ export function planProductionImport(
     return !same.length
   })
   return {
+    eventBindings,
     state: next,
     teamToCreate,
     entries,

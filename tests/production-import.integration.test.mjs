@@ -69,6 +69,7 @@ test('production import through authenticated APIs: backup, partial recovery, li
       await context.addCookies([{ name: 'verdant_session', value: cookie.slice(cookie.indexOf('=') + 1), url: base }])
       const page = await context.newPage()
       await page.goto(`${base}/verdant/financeiro`)
+      await page.getByRole('button',{name:'Importar dados',exact:true}).click()
       await page.getByRole('heading', { name: 'Importar produção e equipe' }).waitFor()
       await page.getByLabel('Pacote de produção').setInputFiles({ name: 'importacao.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(bundle)) })
       await page.route('**/api/finance/production-backup', route => route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'Backup indisponível no teste' }) }))

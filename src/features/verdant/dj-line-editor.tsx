@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button'
 import type { VerdantState } from './data'
 import { applyDjLine, djLineRows, type DjLineRow } from './dj-line'
 
-type EditableRow = DjLineRow & { originalId: string }
+type EditableRow = DjLineRow & { originalId: string; originalPersonId: string }
 export function DjLineEditor({
   data,
   eventId,
@@ -14,13 +14,17 @@ export function DjLineEditor({
   update: (mutate: (state: VerdantState) => VerdantState) => Promise<boolean>
 }) {
   const [rows, setRows] = useState<EditableRow[]>(() =>
-    djLineRows(data, eventId).map((row) => ({ ...row, originalId: row.id }))
+    djLineRows(data, eventId).map((row) => ({
+      ...row,
+      originalId: row.slotKey || row.id,
+      originalPersonId: row.id,
+    }))
   )
   const [track, setTrack] = useState('')
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const [reviewed, setReviewed] = useState(false)
-  const changed = rows.some((row) => row.id !== row.originalId)
+  const changed = rows.some((row) => row.id !== row.originalPersonId)
   function patch(originalId: string, fields: Partial<EditableRow>) {
     setRows((current) =>
       current.map((row) =>
@@ -134,7 +138,8 @@ export function DjLineEditor({
                               disabled={rows.some(
                                 (other) =>
                                   other.originalId !== row.originalId &&
-                                  other.id === person.id
+                                  other.id === person.id &&
+                                  other.track === row.track
                               )}
                             >
                               {person.name}

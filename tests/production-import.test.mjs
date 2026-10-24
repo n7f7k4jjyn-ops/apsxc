@@ -32,3 +32,37 @@ test('malformed records and source conflicts cannot enter finance', () => {
   const result = planProductionImport(readProductionBundle(d), emptyState(), [], finance())
   assert.equal(result.entries.length, 0); assert.equal(result.newPeople, 0)
 })
+
+test('event display prefixes and known aliases reuse the event; explicit choices require the same date',()=>{
+ const bundle=fixture();bundle.engagements[0].event='FRENÉTIKA';bundle.finance[0].eventKey='2026-10-23|frenetika'
+ const state=emptyState();state.events=[{id:'party',date:'2026-10-23',name:'Sexta · FRENÉTIKA'}]
+ const result=planProductionImport(readProductionBundle(bundle),state,[],finance())
+ assert.equal(result.newEvents,0);assert.equal(result.entries[0].eventId,'party')
+ state.events[0].name='Sexta · 23/10/2026'
+ const pending=planProductionImport(bundle,state,[],finance());assert.equal(pending.eventBindings.length,1)
+ const resolved=planProductionImport(bundle,state,[],finance(),{'2026-10-23|frenetika':'party'})
+ assert.equal(resolved.entries.length,1);assert.equal(resolved.eventBindings.length,0)
+ assert.throws(()=>planProductionImport(bundle,state,[],finance(),{'2026-10-23|frenetika':'missing'}),/inválido/)
+})
+test('multiple tracks are retained and reimport never duplicates them or their payable',()=>{
+ const bundle=fixture();bundle.engagements.push({...bundle.engagements[0],id:'gig2',track:'LAND',time:'01:00'})
+ const first=planProductionImport(readProductionBundle(bundle),emptyState(),[],finance())
+ const detail=first.state.people[0].eventDetails[first.state.events[0].id]
+ assert.equal(detail.track,'SKY');assert.equal(detail.additionalSets[0].track,'LAND');assert.equal(detail.additionalSets[0].time,'01:00')
+ assert.equal(first.issues.some(issue=>issue.includes('Mais de uma pista')),false)
+ const again=planProductionImport(bundle,first.state,[],{...finance(),entries:first.entries})
+ assert.equal(again.state.people[0].eventDetails[first.state.events[0].id].additionalSets.length,1);assert.equal(again.entries.length,0)
+})
+
+test('authorized historical creation preserves existing events, finance values and no conversion data',()=>{
+ const bundle=fixture();bundle.engagements[0].event='Festa de julho';bundle.engagements[0].date='2026-07-04';bundle.finance[0].dueDate='2026-07-04';bundle.finance[0].eventKey='2026-07-04|festa de julho'
+ const state=emptyState();state.events=[{id:'old-calendar',date:'2026-07-04',name:'Sábado · 04/07/2026',active:true}]
+ const before=structuredClone(state)
+ const result=planProductionImport(readProductionBundle(bundle),state,[],finance(),{},true)
+ assert.equal(result.newEvents,1);assert.equal(result.entries.length,1);assert.equal(result.entries[0].amountCents,30000)
+ const historical=result.state.events.find(event=>event.id!== 'old-calendar')
+ assert.equal(historical.date,'2026-07-04');assert.equal(historical.active,false);assert.equal(historical.conversion,undefined)
+ assert.deepEqual(result.state.registrations,[]);assert.deepEqual(state,before)
+ const again=planProductionImport(bundle,result.state,[],{...finance(),entries:result.entries},{},true)
+ assert.equal(again.newEvents,0);assert.equal(again.entries.length,0)
+})

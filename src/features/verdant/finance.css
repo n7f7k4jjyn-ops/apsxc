@@ -135,3 +135,6 @@
 .finance-compact-summary button:hover {background:var(--accent)}
 .finance-compact-summary span {font-size:.75rem;color:var(--muted-foreground)}
 .finance-compact-summary strong {font-size:1rem;white-space:nowrap}
+.finance-import-tools {scroll-margin-top:140px;border-color:var(--primary)}
+.finance-import-tools > summary {padding-block:4px;color:var(--primary)}
+.finance-import-tools[open] > .finance-panel {margin-top:16px}
