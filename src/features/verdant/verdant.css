@@ -139,6 +139,9 @@
 .dark .verdant-config-footer small.verdant-save-notice { color: #bdebc9; }
 .verdant-filter-bar { display: flex; align-items: center; gap: 8px; max-width: 360px; margin: 0 0 14px; color: var(--muted-foreground); }
 .verdant-column-filter-bar { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 7px; margin: 0 0 12px; }
+.verdant-advanced-filters { margin-bottom: 16px; }
+.verdant-advanced-filters>summary { min-height: 44px; padding: 12px 0; color: var(--muted-foreground); font-size: 13px; cursor: pointer; }
+.verdant-column-filter-bar>.verdant-search-field { flex: 1 1 240px; max-width: 420px; }
 .verdant-column-filter { display: grid; align-content: start; gap: 5px; min-width: 0; }
 .verdant-column-filter-trigger { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; border: 1px solid var(--border); border-radius: 8px; padding: 5px 8px; background: var(--card); color: var(--muted-foreground); font-size: 11px; font-weight: 600; cursor: pointer; }
 .verdant-column-filter-trigger:hover,.verdant-column-filter-trigger:focus-visible,.verdant-column-filter-trigger.active { border-color: #6ca488; color: var(--foreground); outline: none; }
@@ -396,11 +399,13 @@
   .verdant-event-editor-shell.mobile.open>.verdant-event-editor { width: 100%; max-height: 92dvh; overflow-y: auto; overscroll-behavior: contain; border: 0; border-radius: 18px 18px 0 0; padding-bottom: env(safe-area-inset-bottom); box-shadow: 0 -12px 40px rgb(0 0 0 / 20%); }
   .verdant-event-editor-shell.mobile.open .verdant-event-editor-heading { padding-inline-end: 40px; }
   .verdant-event-editor-shell.mobile.open .verdant-event-editor-heading>button { min-height: 40px; }
-  .verdant-main [data-slot=button] { min-height: 42px; }
-  .verdant-main [data-slot=button].size-9 { min-width: 42px; }
+  .verdant-main [data-slot=button] { min-height: 44px; }
+  .verdant-main [data-slot=button].size-9 { min-width: 44px; }
   .verdant-public [data-slot=button] { min-height: 44px; }
   .verdant-field input,.verdant-field select,.verdant-field textarea { min-height: 44px; }
-  .verdant-column-filter-trigger,.verdant-event-list-option { min-height: 42px; }
+  .verdant-column-filter-trigger,.verdant-event-list-option,.verdant-column-filter-clear { min-height: 44px; }
+  .verdant-column-filter-input input,.verdant-column-filter-input select { min-height: 44px; }
+  .verdant-column-filter-bar>.verdant-search-field { flex-basis: 100%; max-width: 100%; }
   .verdant-calendar-grid { gap: 3px; }
   .verdant-calendar-day { min-height: 44px; padding: 5px; }
   .verdant-calendar-event { grid-template-columns: 10px minmax(0,1fr) 16px; }

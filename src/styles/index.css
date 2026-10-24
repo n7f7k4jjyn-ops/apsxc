@@ -71,7 +71,7 @@
       min-width: 44px;
     }
 
-    header[data-app-header] > div {
+    header[data-app-header] > div:first-child {
       min-width: 0;
     }
 
