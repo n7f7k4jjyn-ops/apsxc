@@ -9,7 +9,7 @@
     "start": "node server.mjs",
     "auth:hash": "node scripts/hash-password.mjs",
     "lint": "eslint .",
-    "test:server": "node tests/server.integration.test.mjs && node lib/public-form-meta.test.mjs && node lib/registry.test.mjs && node lib/rosters.test.mjs && node --test lib/finance.test.mjs tests/finance.integration.test.mjs",
+    "test:server": "node tests/server.integration.test.mjs && node lib/public-form-meta.test.mjs && node lib/registry.test.mjs && node lib/rosters.test.mjs && node --test lib/finance.test.mjs test[...],
     "preview": "vite preview",
     "format:check": "prettier --check .",
     "format": "prettier --write .",
@@ -19,7 +19,8 @@
     "test:ui": "vitest --ui --browser.headless",
     "test:browser": "vitest",
     "test:coverage": "vitest run --coverage --browser.headless",
-    "test:browser:install": "playwright install chromium --with-deps"
+    "test:browser:install": "playwright install chromium --with-deps",
+    "postinstall": "npm run build"
   },
   "dependencies": {
     "@clerk/react": "^6.4.3",
