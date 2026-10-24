@@ -17,6 +17,7 @@ import { PUBLIC_FORM_META, personalizeFormShareHtml } from './lib/public-form-me
 import { emptyFinance, validateFinanceStore, changeFinance } from './lib/finance.mjs'
 import { ZIG_BASE_URL, ZigError, createZigClient, validateToken as validZigToken } from './lib/zig-client.mjs'
 import { buildZigPreview, collectZigData, formatZigPreview, listZigEvents, matchZigData, validatePreviewPeriod } from './lib/zig-preview.mjs'
+import { planEventMerge } from './lib/event-merge.mjs'
 import { ZigApplyError, mergePending, planZigWrites, publicPending, pushRun, resolvePending } from './lib/zig-apply.mjs'
 
 const root = path.dirname(fileURLToPath(import.meta.url))
@@ -2068,6 +2069,31 @@ const server = createServer(async (request, response) => {
       await writeJsonFile(integrationsPath, settings)
       response.setHeader('Cache-Control', 'no-store')
       return sendJson(response, 200, { settings: integrationSettingsForAdmin(settings) })
+    }
+    if (url.pathname === '/api/admin/events/merge' && request.method === 'POST') {
+      const mergeUser = await requireCapability(request, response, 'zig:manage')
+      if (!mergeUser) return
+      if (!isMasterAdminAccount(mergeUser)) return sendJson(response, 403, { error: 'A mesclagem de eventos é restrita ao administrador master.' })
+      const value = await bodyJson(request)
+      const keepId = String(value?.keepId || '')
+      const dropId = String(value?.dropId || '')
+      const result = await queueStateMutation(async () => {
+        const state = await readState()
+        let plan
+        try { plan = planEventMerge(state, keepId, dropId) } catch (error) { throw requestError(error.message) }
+        if (value?.confirm !== true) return { dryRun: true, report: plan.report }
+        if (!Number.isSafeInteger(value.revision) || value.revision !== state.revision) throw requestError('Os dados mudaram após a simulação. Refaça a simulação.', 409)
+        const file = `events-merge-${new Date().toISOString().replace(/[:.]/g, '-')}.json`
+        await mkdir(backupDirectory, { recursive: true })
+        await writeFile(path.join(backupDirectory, file), JSON.stringify({ createdAt: new Date().toISOString(), state }), { encoding: 'utf8', mode: 0o600 })
+        const saved = { ...plan.state, revision: state.revision + 1, updatedAt: new Date().toISOString() }
+        if (!await saveStateIfRevision(saved, state.revision)) {
+          currentState = undefined
+          throw requestError('Os dados mudaram durante a mesclagem. Nada foi gravado; tente novamente.', 409)
+        }
+        return { dryRun: false, report: plan.report, backup: file, revision: saved.revision }
+      })
+      return sendJson(response, 200, { ...result, revision: result.revision ?? (await readState()).revision })
     }
     if (url.pathname.startsWith('/api/admin/zig/')) {
       const zigUser = await requireCapability(request, response, 'zig:manage')
