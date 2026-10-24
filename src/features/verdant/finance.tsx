@@ -36,6 +36,8 @@ import {
 } from './finance-data'
 import './finance.css'
 import { ZigEventSummary } from './zig-event-summary'
+import { ProductionImportPanel } from './production-import-panel'
+import { InfluencerCommissionsPanel } from './influencer-commissions-panel'
 
 const blank = (): FinanceDraft => ({
   externalId: `manual:${crypto.randomUUID()}`,
@@ -123,7 +125,7 @@ function isLedger(value: unknown): value is Pick<
           'updatedAt',
         ].every((key) => typeof entry[key] === 'string') &&
         ['payable', 'receivable'].includes(String(entry.type)) &&
-        ['general', 'team', 'dj', 'sales'].includes(String(entry.category)) &&
+        ['general', 'team', 'dj', 'influencer', 'sales'].includes(String(entry.category)) &&
         ['pending', 'settled', 'cancelled'].includes(String(entry.status)) &&
         ['', 'cash', 'pix', 'transfer', 'card', 'other'].includes(
           String(entry.paymentMethod)
@@ -152,7 +154,7 @@ function isFinanceData(value: unknown): value is FinanceData {
         record(person) &&
         typeof person.id === 'string' &&
         typeof person.name === 'string' &&
-        ['team', 'dj'].includes(String(person.kind)) &&
+        ['team', 'dj', 'influencer'].includes(String(person.kind)) &&
         (person.pixKey === undefined || typeof person.pixKey === 'string')
     ) &&
     Array.isArray(events) &&
@@ -624,6 +626,8 @@ function AdminFinance() {
 
   return (
     <section className='finance-page' aria-label='Financeiro'>
+      <ProductionImportPanel onImported={() => void load()} />
+      <InfluencerCommissionsPanel onChanged={() => void load()} />
       <div className='finance-heading'>
         <div>
           <h1>Financeiro</h1>
@@ -1058,7 +1062,7 @@ function AdminFinance() {
         <details>
           <summary>Referências para planilha</summary>
           <p>
-            Equipe e DJs são apenas contas a pagar. Informe beneficiario_id ou
+            Equipe, DJs e influencers são apenas contas a pagar. Repasses de influencers exigem entrada confirmada. Informe beneficiario_id ou
             favorecido com nome único da categoria; o nome é resolvido na
             prévia. evento_id é opcional.
           </p>
@@ -1150,7 +1154,7 @@ function AdminFinance() {
                     <option value='payable'>A pagar</option>
                     <option
                       value='receivable'
-                      disabled={draft.category === 'team' || draft.category === 'dj'}
+                      disabled={draft.category === 'team' || draft.category === 'dj' || draft.category === 'influencer'}
                     >
                       A receber
                     </option>
@@ -1178,6 +1182,7 @@ function AdminFinance() {
                     <option value='dj' disabled={draft.type !== 'payable'}>
                       DJ
                     </option>
+                    {draft.category === 'influencer' && <option value='influencer'>Influencer · entrada confirmada</option>}
                   </select>
                 </Field>
                 <Field id='finance-description' label='Descrição'>
@@ -1197,12 +1202,12 @@ function AdminFinance() {
                     id='finance-counterparty'
                     required
                     maxLength={200}
-                    readOnly={draft.category === 'team' || draft.category === 'dj'}
+                    readOnly={draft.category === 'team' || draft.category === 'dj' || draft.category === 'influencer'}
                     value={draft.counterparty}
                     onChange={(e) => change('counterparty', e.target.value)}
                   />
                 </Field>
-                {(draft.category === 'team' || draft.category === 'dj') && (
+                {(draft.category === 'team' || draft.category === 'dj' || draft.category === 'influencer') && (
                   <Field id='finance-beneficiary' label='Beneficiário'>
                     <select
                       id='finance-beneficiary'

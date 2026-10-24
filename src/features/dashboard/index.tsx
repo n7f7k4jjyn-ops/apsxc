@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useAuthStore } from '@/stores/auth-store'
+import { FinancialSummary } from './financial-summary'
 import { Link } from '@tanstack/react-router'
 import {
   ArrowUpRight,
@@ -67,12 +69,33 @@ type ExtraSummary = {
 }
 
 export function Dashboard() {
+  const admin = useAuthStore(state => state.auth.user?.role.includes('admin'))
+  const { data, initialize } = useVerdantStore()
+  const [summary, setSummary] = useState<'operation' | 'finance'>('operation')
+  const [now, setNow] = useState(Date.now)
+  useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 30000); return () => window.clearInterval(timer) }, [])
+  const [period, setPeriod] = useState<Period>('week')
+  const [focusId, setFocusId] = useState('next')
+  useEffect(() => { void initialize() }, [initialize])
+  const workflow = buildWorkflow(data, now, period, focusId)
+  const summarySwitch = <>
+    <nav aria-label='Tipo de resumo' className='flex flex-wrap gap-2'>
+      <Button variant={summary === 'operation' ? 'default' : 'outline'} aria-pressed={summary === 'operation'} onClick={() => setSummary('operation')}>Resumo da operação</Button>
+      {admin && <Button variant={summary === 'finance' ? 'default' : 'outline'} aria-pressed={summary === 'finance'} onClick={() => setSummary('finance')}>Resumo financeiro</Button>}
+    </nav>
+    <div className='summary-filters flex flex-wrap items-end gap-3 rounded-xl border p-3'>
+      <label className='grid min-w-0 flex-1 gap-1 text-sm'>Evento em foco<select className='h-11 rounded-md border bg-background px-3' value={focusId} onChange={e => setFocusId(e.target.value)}><option value='next'>Próximo evento</option><option value='all'>Todos os eventos ativos</option>{workflow.events.map(event => <option key={event.id} value={event.id}>{event.date.split('-').reverse().join('/')} · {event.name}</option>)}</select></label>
+      <div><p className='mb-1 text-sm'>Período</p><div className='flex gap-1'>{(['day', 'week', 'month'] as const).map(value => <Button key={value} size='sm' variant={period === value ? 'secondary' : 'ghost'} aria-pressed={period === value} onClick={() => setPeriod(value)}>{{day:'Hoje', week:'Esta semana', month:'Este mês'}[value]}</Button>)}</div></div>
+    </div>
+  </>
+  return admin && summary === 'finance' ? <FinancialSummary summarySwitch={summarySwitch} period={period} focusId={focusId} now={now} /> : <OperationsDashboard summarySwitch={summarySwitch} period={period} focusId={focusId} />
+}
+
+function OperationsDashboard({ summarySwitch, period, focusId }: { summarySwitch: ReactNode; period: Period; focusId: string }) {
   const { translate } = useLanguage()
   const { data, ready, serverConnected, initialize, refresh } =
     useVerdantStore()
   const [now, setNow] = useState(Date.now)
-  const [period, setPeriod] = useState<Period>('week')
-  const [focusId, setFocusId] = useState('next')
   const [extra, setExtra] = useState<ExtraSummary | null>(null)
   const [extraError, setExtraError] = useState('')
   const [refreshing, setRefreshing] = useState(false)
@@ -167,6 +190,7 @@ export function Dashboard() {
         </div>
       </Header>
       <Main className='verdant-summary space-y-4 sm:space-y-5'>
+        {summarySwitch}
         <div className='flex flex-wrap items-start justify-between gap-3'>
           <div>
             <h1 className='text-xl font-bold tracking-tight sm:text-2xl'>
@@ -212,51 +236,6 @@ export function Dashboard() {
               : translate(
                   'Servidor desconectado. Os dados exibidos podem estar desatualizados.'
                 )}
-        </div>
-        <div className='summary-filters grid gap-3 rounded-xl border bg-muted/20 p-3 sm:flex sm:flex-wrap sm:items-end sm:justify-between'>
-          <label className='grid min-w-0 flex-1 gap-1 text-xs font-medium'>
-            <LocalizedText text='Evento em foco' />
-            <select
-              className='h-11 w-full min-w-0 rounded-md border bg-background px-3 text-base sm:h-10 sm:min-w-48 sm:text-sm'
-              value={focusId}
-              onChange={(event) => setFocusId(event.target.value)}
-            >
-              <option value='next'>{translate('Próximo evento')}</option>
-              <option value='all'>
-                {translate('Todos os eventos ativos')}
-              </option>
-              {workflow.events.map((event) => (
-                <option key={event.id} value={event.id}>
-                  {formatDate(event.date, { day: '2-digit', month: '2-digit' })}{' '}
-                  · {event.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div>
-            <p className='mb-1 text-xs font-medium'>
-              <LocalizedText text='Inscrições recebidas no período' />
-            </p>
-            <div className='grid grid-cols-3 gap-1 sm:flex'>
-              {(['day', 'week', 'month'] as const).map((value) => (
-                <Button
-                  key={value}
-                  size='sm'
-                  variant={period === value ? 'secondary' : 'ghost'}
-                  aria-pressed={period === value}
-                  onClick={() => setPeriod(value)}
-                >
-                  <LocalizedText
-                    text={
-                      { day: 'Hoje', week: 'Esta semana', month: 'Este mês' }[
-                        value
-                      ]
-                    }
-                  />
-                </Button>
-              ))}
-            </div>
-          </div>
         </div>
         <div className='grid grid-cols-2 gap-3 xl:grid-cols-4'>
           {[

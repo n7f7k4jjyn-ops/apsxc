@@ -1,7 +1,7 @@
 export type FinanceDraft = {
   externalId: string
   type: 'payable' | 'receivable'
-  category: 'general' | 'team' | 'dj' | 'sales'
+  category: 'general' | 'team' | 'dj' | 'influencer' | 'sales'
   description: string
   counterparty: string
   beneficiaryId: string
@@ -24,7 +24,7 @@ export type FinanceEntry = FinanceDraft & {
 export type FinanceBeneficiary = {
   id: string
   name: string
-  kind: 'team' | 'dj'
+  kind: 'team' | 'dj' | 'influencer'
   pixKey?: string
 }
 
@@ -36,7 +36,13 @@ export type FinanceData = {
 }
 
 export const financeTypes = { payable: 'A pagar', receivable: 'A receber' }
-export const financeCategories = { general: 'Geral', team: 'Equipe', dj: 'DJ', sales: 'Vendas Zig' }
+export const financeCategories = {
+  general: 'Geral',
+  team: 'Equipe',
+  dj: 'DJ',
+  influencer: 'Influencer',
+  sales: 'Vendas Zig',
+}
 export const financeStatuses = {
   pending: 'Pendente',
   settled: 'Baixado',
@@ -244,6 +250,8 @@ export function parseFinanceCsv(
           equipe: 'team',
           team: 'team',
           dj: 'dj',
+          influencer: 'influencer',
+          influenciador: 'influencer',
           vendas: 'sales',
           'vendas zig': 'sales',
           sales: 'sales',
@@ -298,7 +306,11 @@ export function parseFinanceCsv(
       let counterparty = get('counterparty')
       if (category === 'sales' && type !== 'receivable')
         throw new Error('Vendas Zig devem ser contas a receber.')
-      if (category === 'team' || category === 'dj') {
+      if (
+        category === 'team' ||
+        category === 'dj' ||
+        category === 'influencer'
+      ) {
         if (type !== 'payable')
           throw new Error('Equipe e DJs devem ser contas a pagar.')
         const matches = beneficiaries.filter(

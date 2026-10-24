@@ -25,6 +25,8 @@ export type Person = {
   kind: 'DJ' | 'INFLUENCIADORES'
   name: string
   phone: string
+  pixKey?: string
+  beneficiaryName?: string
   email: string
   instagram: string
   notes: string
