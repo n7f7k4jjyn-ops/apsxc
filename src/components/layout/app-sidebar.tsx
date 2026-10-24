@@ -16,6 +16,7 @@ import { TeamSwitcher } from './team-switcher'
 import { InstallAppButtons } from './install-app-buttons'
 import { useLanguage } from '@/context/language-provider'
 import { useAuthStore } from '@/stores/auth-store'
+import { getNavigationPage } from '@/lib/navigation'
 
 export function AppSidebar() {
   const { collapsible, variant } = useLayout()
@@ -44,7 +45,7 @@ export function AppSidebar() {
           items: item.items.map((child) => ({ ...child, title: translate(child.title) })),
         }
       }
-      return { ...item, title: translate(item.title) }
+      return { ...item, title: translate(getNavigationPage(String(item.url)).title) }
     }),
   }))
   const roleFilteredGroups = translatedGroups.flatMap((group) => {
@@ -67,7 +68,7 @@ export function AppSidebar() {
           const children = item.items.filter((child) => navigation.includes(String(child.url)))
           return children.length ? [{ ...item, items: children }] : []
         }
-        return item.url && (navigation.includes(String(item.url)) || (String(item.url)==='/verdant/escalas' && navigation.includes('/verdant/agenda'))) ? [item] : []
+        return item.url && (navigation.includes(String(item.url)) || (String(item.url)==='/verdant/inscricoes' && navigation.includes('/verdant/respostas')) || (String(item.url)==='/verdant/escalas' && navigation.includes('/verdant/agenda'))) ? [item] : []
       })
       return items.length ? [{ ...group, items }] : []
     })

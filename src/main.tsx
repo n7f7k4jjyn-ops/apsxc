@@ -10,6 +10,7 @@ import { RouterProvider, createRouter } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import { useAuthStore } from '@/stores/auth-store'
 import { handleServerError } from '@/lib/handle-server-error'
+import { PageLoading } from '@/components/page-state'
 import { DirectionProvider } from './context/direction-provider'
 import { FontProvider } from './context/font-provider'
 import { ThemeProvider } from './context/theme-provider'
@@ -60,10 +61,6 @@ const queryClient = new QueryClient({
         }
         if (error.response?.status === 500) {
           toast.error('Erro interno do servidor.')
-          // Only navigate to error page in production to avoid disrupting HMR in development
-          if (import.meta.env.PROD) {
-            router.navigate({ to: '/500' })
-          }
         }
         if (error.response?.status === 403) {
           // router.navigate("/forbidden", { replace: true });
@@ -79,6 +76,8 @@ const router = createRouter({
   context: { queryClient },
   defaultPreload: 'intent',
   defaultPreloadStaleTime: 0,
+  defaultPendingComponent: PageLoading,
+  defaultPendingMs: 150,
 })
 
 // Register the router instance for type safety
@@ -124,4 +123,3 @@ if (!rootElement.innerHTML) {
     </StrictMode>
   )
 }
-

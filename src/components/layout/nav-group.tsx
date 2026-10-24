@@ -1,6 +1,8 @@
 import { type ReactNode } from 'react'
 import { Link, useLocation } from '@tanstack/react-router'
 import { ChevronRight } from 'lucide-react'
+import { trackNavigation } from '@/lib/analytics'
+import { isNavigationActive } from '@/lib/navigation'
 import {
   Collapsible,
   CollapsibleContent,
@@ -35,9 +37,9 @@ import {
 
 export function NavGroup({ title, items }: NavGroupProps) {
   const { state, isMobile } = useSidebar()
-  const href = useLocation({ select: (location) => location.href })
+  const href = useLocation({ select: (location) => location.pathname })
   return (
-    <SidebarGroup>
+    <SidebarGroup role='navigation' aria-label={title}>
       <SidebarGroupLabel>{title}</SidebarGroupLabel>
       <SidebarMenu>
         {items.map((item) => {
@@ -71,7 +73,16 @@ function SidebarMenuLink({ item, href }: { item: NavLink; href: string }) {
         isActive={checkIsActive(href, item)}
         tooltip={item.title}
       >
-        <Link to={item.url} onClick={() => setOpenMobile(false)}>
+        <Link
+          to={item.url}
+          aria-current={checkIsActive(href, item) ? 'page' : undefined}
+          onClick={() => {
+            trackNavigation('menu_click', href, {
+              destination: String(item.url),
+            })
+            setOpenMobile(false)
+          }}
+        >
           {item.icon && <item.icon />}
           <span>{item.title}</span>
           {item.badge && <NavBadge>{item.badge}</NavBadge>}
@@ -92,12 +103,15 @@ function SidebarMenuCollapsible({
   return (
     <Collapsible
       asChild
-      defaultOpen={checkIsActive(href, item, true)}
+      defaultOpen={checkIsActive(href, item)}
       className='group/collapsible'
     >
       <SidebarMenuItem>
         <CollapsibleTrigger asChild>
-          <SidebarMenuButton tooltip={item.title}>
+          <SidebarMenuButton
+            tooltip={item.title}
+            isActive={checkIsActive(href, item)}
+          >
             {item.icon && <item.icon />}
             <span>{item.title}</span>
             {item.badge && <NavBadge>{item.badge}</NavBadge>}
@@ -112,7 +126,18 @@ function SidebarMenuCollapsible({
                   asChild
                   isActive={checkIsActive(href, subItem)}
                 >
-                  <Link to={subItem.url} onClick={() => setOpenMobile(false)}>
+                  <Link
+                    to={subItem.url}
+                    aria-current={
+                      checkIsActive(href, subItem) ? 'page' : undefined
+                    }
+                    onClick={() => {
+                      trackNavigation('menu_click', href, {
+                        destination: String(subItem.url),
+                      })
+                      setOpenMobile(false)
+                    }}
+                  >
                     {subItem.icon && <subItem.icon />}
                     <span>{subItem.title}</span>
                     {subItem.badge && <NavBadge>{subItem.badge}</NavBadge>}
@@ -157,6 +182,12 @@ function SidebarMenuCollapsedDropdown({
             <DropdownMenuItem key={`${sub.title}-${sub.url}`} asChild>
               <Link
                 to={sub.url}
+                aria-current={checkIsActive(href, sub) ? 'page' : undefined}
+                onClick={() =>
+                  trackNavigation('menu_click', href, {
+                    destination: String(sub.url),
+                  })
+                }
                 className={`${checkIsActive(href, sub) ? 'bg-secondary' : ''}`}
               >
                 {sub.icon && <sub.icon />}
@@ -173,13 +204,8 @@ function SidebarMenuCollapsedDropdown({
   )
 }
 
-function checkIsActive(href: string, item: NavItem, mainNav = false) {
-  return (
-    href === item.url || // /endpint?search=param
-    href.split('?')[0] === item.url || // endpoint
-    !!item?.items?.filter((i) => i.url === href).length || // if child nav is active
-    (mainNav &&
-      href.split('/')[1] !== '' &&
-      href.split('/')[1] === item?.url?.split('/')[1])
-  )
+function checkIsActive(href: string, item: NavItem): boolean {
+  return item.items
+    ? item.items.some((child) => checkIsActive(href, child))
+    : isNavigationActive(href, String(item.url))
 }

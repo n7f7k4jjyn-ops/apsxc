@@ -2,10 +2,11 @@ import { useState } from 'react'
 import { z } from 'zod'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useNavigate } from '@tanstack/react-router'
+import { useRouter } from '@tanstack/react-router'
 import { Loader2, LogIn } from 'lucide-react'
 import { useAuthStore } from '@/stores/auth-store'
 import { cn } from '@/lib/utils'
+import { safeRedirect } from '@/lib/navigation'
 import { Button } from '@/components/ui/button'
 import {
   Form,
@@ -43,7 +44,7 @@ export function UserAuthForm({
 }: UserAuthFormProps) {
   const [isLoading, setIsLoading] = useState(false)
   const { translate } = useLanguage()
-  const navigate = useNavigate()
+  const router = useRouter()
   const { auth } = useAuthStore()
   const rememberedUsername = appearance === 'verdant' ? getRememberedUsername() : ''
   const passwordSchema = z
@@ -91,8 +92,8 @@ export function UserAuthForm({
         }
       }
       auth.setUser(result.user)
-      const targetPath = redirectTo?.startsWith('/') && !redirectTo.startsWith('//') ? redirectTo : '/'
-      await navigate({ to: targetPath, replace: true })
+      await router.invalidate()
+      await router.navigate({ href: safeRedirect(redirectTo), replace: true })
     } catch (error) {
       form.setError('root', { message: translate(error instanceof Error ? error.message : 'Falha ao entrar. Tente novamente.') })
     } finally {
@@ -167,4 +168,3 @@ export function UserAuthForm({
     </Form>
   )
 }
-

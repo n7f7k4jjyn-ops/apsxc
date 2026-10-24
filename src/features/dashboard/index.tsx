@@ -37,6 +37,8 @@ import { Main } from '@/components/layout/main'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
+import { EmptyEvents, PageError, PageLoading } from '@/components/page-state'
+import { trackNavigation } from '@/lib/analytics'
 import { formatDate, type FormKey } from '@/features/verdant/data'
 import { useVerdantStore } from '@/features/verdant/store'
 import './mobile.css'
@@ -170,6 +172,7 @@ function OperationsDashboard({ summarySwitch, period, focusId, range }: { summar
     }
   }, [initialize, loadExtra])
   async function refreshAll() {
+    trackNavigation('cta_click', '/', { action: 'refresh_dashboard' })
     setRefreshing(true)
     try {
       await Promise.all([refresh(), loadExtra()])
@@ -197,6 +200,9 @@ function OperationsDashboard({ summarySwitch, period, focusId, range }: { summar
         </div>
       </Header>
       <Main className='verdant-summary space-y-4 sm:space-y-5'>
+        {!ready && <PageLoading />}
+        {ready && !serverConnected && <PageError retry={() => void refreshAll()} />}
+        {ready && serverConnected && data.events.length === 0 && <EmptyEvents />}
         {summarySwitch}
         <div className='flex flex-wrap items-start justify-between gap-3'>
           <div>

@@ -22,6 +22,31 @@ npm start
 
 O servidor escuta a porta `PORT` (padrão `3000`) e serve os arquivos compilados de `dist/`.
 
+## Navegação e experiência de uso
+
+- **Resumo** é a entrada da operação. Agenda, inscrições, relatórios, listas, formulários, cadastros e conteúdo ficam acessíveis diretamente pelo menu e pelos atalhos do cabeçalho; escalas e financeiro aparecem para administradores.
+- As rotas são definidas pelos arquivos em `src/routes/`; `src/routeTree.gen.ts` é gerado pelo plugin TanStack Router e não deve ser editado manualmente. Os metadados compartilhados (títulos, hierarquia, atalhos e correspondência de seção ativa) ficam em `src/lib/navigation.ts`.
+- Ao adicionar uma página, crie seu arquivo de rota, registre seus metadados em `navigationPages` e adicione a entrada em `src/components/layout/data/sidebar-data.ts`. Mantenha no máximo dois níveis de menu e confira permissões e preferências de navegação existentes.
+- Novas URLs devem seguir o idioma do domínio: `/recurso`, `/recurso/:id`, `/recurso/novo` e `/recurso/:id/editar`. Cadastros que já usam modais continuam usando modais. As URLs atuais, inclusive públicas (`/lista/:slug`, `/lovers`, `/equipe`, `/trabalhe-conosco`), foram preservadas. `/verdant/respostas` redireciona para `/verdant/inscricoes`, mantendo filtros e fragmentos; nenhum dado precisa ser migrado.
+- Páginas privadas ficam sob `_authenticated`, cujo `beforeLoad` chama `requireSession`. Uma sessão expirada retorna ao login com o destino original; falhas de rede mostram erro com nova tentativa, sem simular logout. O retorno após login aceita apenas destinos internos. Rotas Clerk mantêm sua proteção independente.
+- O layout compartilhado oferece título, breadcrumbs, menu ativo e link para saltar ao conteúdo. O drawer móvel usa foco contido, restauração de foco e Esc do Radix; fecha ao navegar. Preserve landmarks, nomes acessíveis, `aria-current`, foco visível e alvos de toque de pelo menos 44 px ao adicionar controles.
+- `PageLoading`, `PageError`, `PageDataState` e `EmptyEvents` em `src/components/page-state.tsx` oferecem padrões reutilizáveis. O workspace operacional mostra skeleton durante a carga e um painel de erro com retry em caso de desconexão. Editores já carregados permanecem montados para preservar rascunhos; as gravações do estado operacional continuam bloqueadas pelo store enquanto desconectado. Feedbacks de gravação existentes continuam usando notificações.
+- O plugin já divide código por rota (`autoCodeSplitting`). O router pré-carrega links por intenção; ao entrar no resumo, agenda e inscrições são pré-carregadas em segundo plano, exceto em conexões lentas ou com economia de dados. Falhas desse pré-carregamento não interrompem a navegação.
+
+### Eventos de navegação
+
+`src/lib/analytics.ts` publica `CustomEvent('verdant:analytics')` no `window`, sem rede, armazenamento ou dependência de fornecedor. Um consumidor opcional pode escutar esse evento e aplicar sua política de consentimento antes de encaminhá-lo:
+
+```js
+window.addEventListener('verdant:analytics', ({ detail }) => {
+  // Encaminhe somente se permitido pela política de consentimento da aplicação.
+})
+```
+
+Eventos: `page_view`, `menu_click`, `breadcrumb_click`, `cta_click` (ações de recuperação, atualização e início da operação) e `route_error` (`not_found` ou `render_error`). O payload usa caminhos conhecidos ou templates, sem query strings, fragmentos, identificadores dinâmicos ou mensagens de erro. Não acrescente nomes, e-mails, tokens ou conteúdo de formulários aos eventos.
+
+Verificação focada: `npm test -- src/lib/navigation.test.ts src/lib/auth-guard.test.ts src/lib/analytics.test.ts src/components/layout/page-context.test.tsx src/features/auth/sign-in/components/user-auth-form.test.tsx`. Antes da primeira execução, instale o navegador com `npm run test:browser:install`.
+
 ## Configuração
 
 Copie `.env.example` para o ambiente privado da hospedagem e configure:

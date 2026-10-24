@@ -79,6 +79,7 @@ import './verdant.css'
 import { getCurrentLanguage, LocalizedText, useLanguage } from '@/context/language-provider'
 import { getCalendarDays } from './calendar-utils'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { PageDataState } from '@/components/page-state'
 
 type Section = 'financeiro' | 'escalas' | 'cadastros' | 'agenda' | 'formularios' | 'listas' | 'respostas' | 'clientes' | 'djs' | 'influencers' | 'exportacoes' | 'configuracoes'
 
@@ -191,6 +192,7 @@ export function VerdantWorkspace({ sectionName }: { sectionName?: string }) {
   const ready = useVerdantStore((s) => s.ready)
   const serverConnected = useVerdantStore((s) => s.serverConnected)
   const initialize = useVerdantStore((s) => s.initialize)
+  const refresh = useVerdantStore((s) => s.refresh)
   const update = useVerdantStore((s) => s.update)
   const section = (sectionName && sectionName in sectionInfo ? sectionName : 'agenda') as Section
 
@@ -219,6 +221,7 @@ export function VerdantWorkspace({ sectionName }: { sectionName?: string }) {
           {translate(serverConnected ? 'Sincronização com servidor ativa' : 'Servidor desconectado · alterações indisponíveis')}
           {!ready && <span className='ms-2'>{<LocalizedText text={"· carregando"} />}</span>}
         </div>
+        <PageDataState ready={ready} connected={serverConnected} retry={() => void refresh()}>
         {section === 'escalas' && <RostersPage data={data} />}
         {section === 'financeiro' && <FinancePage />}
         {section === 'agenda' && <AgendaPage data={data} update={update} />}
@@ -228,6 +231,7 @@ export function VerdantWorkspace({ sectionName }: { sectionName?: string }) {
         {['cadastros','clientes','djs','influencers'].includes(section) && <RegistryPage key={section} initialCategory={section === 'djs' ? 'djs' : section === 'influencers' ? 'influencers' : 'clients'} data={data} renderPeople={kind => <PeoplePage key={kind} kind={kind} data={data} update={update} />} tools={<RegistrationsPage data={data} update={update} serverConnected={serverConnected} />} />}
         {section === 'exportacoes' && <ExportsPage data={data} />}
         {section === 'configuracoes' && <SettingsPage data={data} />}
+        </PageDataState>
       </Main>
     </>
   )

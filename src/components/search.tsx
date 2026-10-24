@@ -20,6 +20,7 @@ export function Search({
         className
       )}
       aria-keyshortcuts='Meta+K Control+K'
+      aria-label={translate(placeholder)}
       onClick={() => setOpen(true)}
     >
       <SearchIcon
@@ -34,4 +35,3 @@ export function Search({
     </Button>
   )
 }
-

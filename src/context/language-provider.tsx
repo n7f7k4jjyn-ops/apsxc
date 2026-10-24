@@ -13,6 +13,17 @@ export type Language = 'pt-BR' | 'en'
 const LANGUAGE_STORAGE_KEY = 'verdant-language'
 
 const english: Record<string, string> = {
+  'Nenhuma tarefa cadastrada.': 'No tasks yet.',
+  'Crie uma tarefa e defina responsáveis e prazos para começar.': 'Create a task and assign owners and deadlines to get started.',
+  'Criar tarefa': 'Create task',
+  'Localização na navegação': 'Breadcrumb navigation',
+  'Carregando página…': 'Loading page…',
+  'Não foi possível carregar os dados.': 'Unable to load data.',
+  'Verifique sua conexão e tente novamente. As alterações estão indisponíveis até reconectar.': 'Check your connection and try again. Changes are unavailable until you reconnect.',
+  'Tentar novamente': 'Try again',
+  'Sua operação começa com um evento': 'Your operation starts with an event',
+  'Adicione uma data na agenda para organizar listas, inscrições e relatórios.': 'Add a date to the calendar to organize lists, registrations and reports.',
+  'Abrir agenda': 'Open calendar',
   'CENTRAL VERDANT': 'VERDANT CENTRAL',
   'Operação de listas Verdant': 'Verdant list management',
   'Agenda e formulários públicos': 'Events and public forms',
