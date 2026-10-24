@@ -15,6 +15,7 @@ import { validateJobApplication, ROLES as TEAM_ROLES, DAYS as TEAM_DAYS } from '
 import { migrateVerdantState } from './lib/verdant-state-migration.mjs'
 import { PUBLIC_FORM_META, personalizeFormShareHtml } from './lib/public-form-meta.mjs'
 import { emptyFinance, validateFinanceStore, changeFinance } from './lib/finance.mjs'
+import { confirmInfluencerAdmission, planInfluencerCommissions } from './lib/influencer-commissions.mjs'
 import { ZIG_BASE_URL, ZigError, createZigClient, validateToken as validZigToken } from './lib/zig-client.mjs'
 import { buildZigPreview, collectZigData, formatZigPreview, listZigEvents, matchZigData, validatePreviewPeriod } from './lib/zig-preview.mjs'
 import { planEventMerge } from './lib/event-merge.mjs'
@@ -516,11 +517,13 @@ async function readRosterTeam() {
   return latestTeam(await readJsonFile(teamRegistrationsPath,[]))
 }
 async function financeReferences() {
-  const [state, team] = await Promise.all([readState(), readRosterTeam()])
+  const [state, team, operations] = await Promise.all([readState(), readRosterTeam(), readOperations()])
   return {
+    influencerAdmissions: operations.influencerAdmissions || [],
     beneficiaries: [
       ...team.map(person => ({ id: `team:${person.id}`, name: person.name, kind: 'team', ...(person.pixKey ? { pixKey: person.pixKey } : {}) })),
-      ...(state.people || []).filter(person => person.kind === 'DJ').map(person => ({ id: `dj:${person.id}`, name: person.name, kind: 'dj' })),
+      ...(state.people || []).filter(person => person.kind === 'DJ').map(person => ({ id: `dj:${person.id}`, name: person.name, kind: 'dj', pixKey: person.pixKey || '' })),
+      ...(state.people || []).filter(person => person.kind === 'INFLUENCIADORES').map(person => ({ id: `influencer:${person.id}`, name: person.name, kind: 'influencer', pixKey: person.pixKey || '' })),
     ],
     events: state.events.map(event => ({ id: event.id, name: event.name, date: event.date, eventTime: event.eventTime, active: event.active !== false })),
   }
@@ -1679,6 +1682,44 @@ const server = createServer(async (request, response) => {
       if (request.headers['sec-fetch-site'] === 'cross-site' || (origin && ![
         `http://${request.headers.host}`, `https://${request.headers.host}`,
       ].includes(origin))) return sendJson(response, 403, { error: 'Origem não autorizada.' })
+      if (request.method === 'GET' && url.pathname === '/api/finance/influencer-admissions') {
+        const [state, operations] = await Promise.all([readState(), readOperations()])
+        response.setHeader('Cache-Control', 'no-store')
+        return sendJson(response, 200, {
+          admissions: operations.influencerAdmissions || [],
+          registrations: state.registrations.filter(r => r.formKey === 'INFLUENCIADORES').map(r => ({ id: r.id, name: r.name, eventId: r.eventId, eventName: r.eventName, eventDate: r.eventDate, influencer: r.optionName })),
+        })
+      }
+      if (request.method === 'POST' && url.pathname === '/api/finance/influencer-admissions') {
+        const payload = await bodyJson(request, 4096)
+        if (typeof payload.registrationId !== 'string') return sendJson(response, 400, { error: 'Informe a inscrição cuja entrada foi conferida.' })
+        const result = await changeOperations(async document => {
+          const result = confirmInfluencerAdmission(document, await readState(), payload.registrationId, user.username)
+          Object.assign(document, result.document)
+          return { admission: result.admission, created: result.created }
+        })
+        return sendJson(response, 200, result)
+      }
+      if (request.method === 'POST' && url.pathname === '/api/finance/influencer-commissions') {
+        const payload = await bodyJson(request, 4096)
+        const [operations, document] = await Promise.all([readOperations(), readFinanceStore()])
+        if (payload.revision !== document.revision) return sendJson(response, 409, { error: 'Financeiro alterado. Atualize antes de gerar os repasses.' })
+        const planned = planInfluencerCommissions(operations, document)
+        const entries = planned.slice(0, 1000)
+        if (!entries.length) return sendJson(response, 200, { ...document, imported: 0, skipped: 0 })
+        await mkdir(backupDirectory, { recursive: true })
+        await writeFile(path.join(backupDirectory, `influencer-${Date.now()}-${randomBytes(6).toString('hex')}.json`), JSON.stringify({ finance: document, admissions: operations.influencerAdmissions }), { mode: 0o600, flag: 'wx' })
+        return sendJson(response, 200, { ...await mutateFinance({ revision: payload.revision, entries }, user.username), remaining: planned.length - entries.length })
+      }
+      if (request.method === 'POST' && url.pathname === '/api/finance/production-backup') {
+        if (!(await requireCapability(request, response, 'team:manage'))) return
+        const [state, team, finance, operations] = await Promise.all([readState(), readRosterTeam(), readFinanceStore(), readOperations()])
+        const backup = `production-${new Date().toISOString().replace(/[:.]/g, '-')}-${randomBytes(6).toString('hex')}.json`
+        await mkdir(backupDirectory, { recursive: true })
+        await writeFile(path.join(backupDirectory, backup), JSON.stringify({ state, team, finance, operations }), { mode: 0o600, flag: 'wx' })
+        response.setHeader('Cache-Control', 'no-store')
+        return sendJson(response, 201, { backup })
+      }
       if (request.method === 'GET' && url.pathname === '/api/finance/zig-reports') {
         return sendJson(response, 200, normalizeReportStore(await readJsonFile(zigReportsPath, {})))
       }

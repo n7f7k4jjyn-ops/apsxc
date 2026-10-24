@@ -36,6 +36,7 @@ test('finance API authorization, atomic imports, concurrency, audit and restart 
   const env = { ...process.env, NODE_ENV: 'test', PORT: String(port), VERDANT_SEED_TEST_STAFF: 'false',
     VERDANT_USERS_JSON: JSON.stringify(['admin', 'operator', 'viewer'].map(role => ({ username: role, role, passwordHash }))),
   }
+  env.VERDANT_BACKUP_DIR = path.join(directory, 'backups')
   for (const key of ['DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASSWORD', 'VERDANT_ADMIN_USERNAME']) delete env[key]
   for (const key of ['DATA', 'SESSIONS', 'TASKS', 'CONTENT_PLAN', 'PREFERENCES', 'TEAM_USERS', 'CHATS', 'CUSTOMERS', 'INTEGRATIONS', 'JOB_APPLICATIONS', 'TEAM_REGISTRATIONS', 'OPERATIONS', 'FINANCE']) {
     env[`VERDANT_${key}_FILE`] = path.join(directory, `${key.toLowerCase()}.json`)
@@ -129,6 +130,28 @@ test('finance API authorization, atomic imports, concurrency, audit and restart 
     const restored = await (await get()).json()
     assert.equal(restored.revision, 5)
     assert.deepEqual(restored.entries, ledger.entries)
+    const importBackup = await fetch(`${url}/api/finance/production-backup`, { method: 'POST', headers, body: '{}' })
+    assert.equal(importBackup.status, 201)
+    const { backup } = await importBackup.json()
+    const backupData = JSON.parse(await readFile(path.join(env.VERDANT_BACKUP_DIR, backup), 'utf8'))
+    assert.deepEqual(backupData.finance.entries, restored.entries)
+    assert.equal(backupData.finance.revision, restored.revision)
+    const influencerState = structuredClone(beforeState)
+    influencerState.events.push({ id: 'commission-event', name: 'Evento teste', date: '2026-10-23', eventTime: '22:00', active: false })
+    influencerState.people.push({ id: 'commission-person', name: 'Influencer teste', kind: 'INFLUENCIADORES', active: false, eventIds: ['commission-event'], eventDetails: {} })
+    influencerState.registrations.push({ id: 'commission-registration', eventId: 'commission-event', eventName: 'Evento teste', eventDate: '2026-10-23', formKey: 'INFLUENCIADORES', optionId: 'commission-person', optionName: 'Influencer teste', name: 'Convidado teste', whatsapp: '41987654321' })
+    assert.equal((await fetch(`${url}/api/state`, { method: 'PUT', headers, body: JSON.stringify(influencerState) })).status, 200)
+    const commissionPost = (endpoint, body) => fetch(`${url}/api/finance/${endpoint}`, { method: 'POST', headers, body: JSON.stringify(body) })
+    // Registration alone creates no commission.
+    assert.equal((await (await commissionPost('influencer-commissions', { revision: 5 })).json()).imported, 0)
+    for (let repeat = 0; repeat < 2; repeat++) assert.equal((await commissionPost('influencer-admissions', { registrationId: 'commission-registration' })).status, 200)
+    const commissions = await commissionPost('influencer-commissions', { revision: 5 })
+    assert.equal(commissions.status, 200)
+    const commissionLedger = await commissions.json()
+    assert.equal(commissionLedger.imported, 1)
+    assert.equal(commissionLedger.entries.at(-1).amountCents, 300)
+    assert.equal(commissionLedger.entries.at(-1).category, 'influencer')
+    assert.equal((await (await commissionPost('influencer-commissions', { revision: commissionLedger.revision })).json()).imported, 0)
     for (const corrupt of ['{ broken', JSON.stringify({ revision: 5, entries: [{ amountCents: 'bad' }] })]) {
       await stop()
       await writeFile(env.VERDANT_FINANCE_FILE, corrupt)

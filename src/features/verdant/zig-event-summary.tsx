@@ -3,7 +3,7 @@ import { formatCents } from './finance-data'
 
 type ListRow = { list: string; registered: number; came: number; conversionPercent: number | null }
 type EventReport = {
-  key: string; name: string; date: string; appEventName: string | null
+  key: string; name: string; date: string; appEventId?: string | null; appEventName: string | null
   presentInHouse: number; registered: number | null; cameFromLists: number | null; conversionPercent: number | null; walkInsWithoutList: number | null
   lists: ListRow[]; salesAvailable: boolean
   totalCents: number; barCents: number; couvertCents: number; entranceCents: number; refundedCents: number
@@ -17,7 +17,7 @@ const pct = (value: number | null) => (value === null ? dash : `${value.toLocale
 const money = (value: number | null) => (value === null ? dash : formatCents(value))
 const dateLabel = (value: string) => value.split('-').reverse().join('/')
 
-export function ZigEventSummary({ from, to }: { from: string; to: string }) {
+export function ZigEventSummary({ from, to, eventId = '', eventIds }: { from: string; to: string; eventId?: string; eventIds?: string[] }) {
   const [reports, setReports] = useState<EventReport[] | null>(null)
   const [error, setError] = useState('')
 
@@ -33,7 +33,7 @@ export function ZigEventSummary({ from, to }: { from: string; to: string }) {
     return () => { active = false }
   }, [])
 
-  const visible = useMemo(() => (reports ?? []).filter((item) => (!from || item.date >= from) && (!to || item.date <= to)), [reports, from, to])
+  const visible = useMemo(() => (reports ?? []).filter((item) => (!from || item.date >= from) && (!to || item.date <= to) && (!eventId || item.appEventId === eventId) && (!eventIds || eventIds.includes(item.appEventId || ''))), [reports, from, to, eventId, eventIds])
   const totals = useMemo(() => {
     const withLists = visible.filter((item) => item.registered !== null)
     const house = visible.reduce((sum, item) => sum + item.presentInHouse, 0)
@@ -68,11 +68,11 @@ export function ZigEventSummary({ from, to }: { from: string; to: string }) {
   return (
     <div>
       <p>
-        Dados vindos da Zig e das listas, gravados em Apps → Zig → “Salvar resumo dos eventos”. Eventos antigos sem evento criado no app aparecem com público e receita da Zig; inscritos e conversão ficam com “—”, pois não há lista para cruzar. Ticket médio = receita (bar, couvert e ingressos) ÷ pessoas na casa; recargas, gorjetas e estornos ficam fora.
+        Resumos salvos da Zig e das listas. Eventos antigos sem evento criado no app aparecem com público e receita da Zig; inscritos e conversão ficam com “—”, pois não há lista para cruzar. Ticket médio = receita (bar, couvert e ingressos) ÷ pessoas na casa; recargas, gorjetas e estornos ficam fora.
       </p>
       <p>Período: {from ? dateLabel(from) : 'início'} a {to ? dateLabel(to) : 'hoje'} (filtro “Período e evento” acima, o mesmo da aba Lista).</p>
-      {!reports.length && <p>Nenhum resumo salvo ainda.</p>}
-      {reports.length > 0 && (
+      {!visible.length && <p>Nenhum resumo salvo para os filtros selecionados.</p>}
+      {visible.length > 0 && (
         <>
           <div className='finance-summary'>
             {cards.map(([label, value]) => (

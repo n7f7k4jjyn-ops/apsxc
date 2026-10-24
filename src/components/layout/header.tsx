@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { Separator } from '@/components/ui/separator'
 import { SidebarTrigger } from '@/components/ui/sidebar'
+import { AppQuickNav } from './app-quick-nav'
 
 type HeaderProps = React.HTMLAttributes<HTMLElement> & {
   fixed?: boolean
@@ -27,7 +28,7 @@ export function Header({ className, fixed, children, ...props }: HeaderProps) {
     <header
       data-app-header=''
       className={cn(
-        'z-50 h-16',
+        'z-50',
         fixed && 'header-fixed peer/header sticky top-0 w-[inherit]',
         offset > 10 && fixed ? 'shadow' : 'shadow-none',
         className
@@ -36,7 +37,7 @@ export function Header({ className, fixed, children, ...props }: HeaderProps) {
     >
       <div
         className={cn(
-          'relative flex h-full min-w-0 items-center gap-2 px-3 sm:gap-4 sm:p-4',
+          'relative flex h-16 min-w-0 items-center gap-2 px-3 sm:gap-4 sm:p-4',
           offset > 10 &&
             fixed &&
             'after:absolute after:inset-0 after:-z-10 after:bg-background/20 after:backdrop-blur-lg'
@@ -46,6 +47,7 @@ export function Header({ className, fixed, children, ...props }: HeaderProps) {
         <Separator orientation='vertical' className='h-6' />
         {children}
       </div>
+      <AppQuickNav />
     </header>
   )
 }
