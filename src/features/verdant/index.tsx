@@ -1,3 +1,4 @@
+import { ColumnFilterControl, SortButton, SortableTableHeader } from './list-controls'
 import { RostersPage } from './rosters'
 import { FinancePage } from './finance'
 import { useAuthStore } from '@/stores/auth-store'
@@ -8,7 +9,7 @@ import { djLineRows, djLineSections, djGuests } from './dj-line'
 import { DjLineEditor } from './dj-line-editor'
 import type { PortariaSection } from './portaria-pdf'
 import { RegistryPage } from './registry'
-import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link } from '@tanstack/react-router'
 import {
   Archive,
@@ -18,6 +19,7 @@ import {
   ArrowRight,
   AtSign,
   CalendarDays,
+  ListFilter,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -28,7 +30,6 @@ import {
   FileSpreadsheet,
   Heart,
   Headphones,
-  ListFilter,
   Megaphone,
   Music2,
   Plus,
@@ -152,62 +153,6 @@ function StatusPill({ open, enabled }: { open: boolean; enabled: boolean }) {
   const { translate } = useLanguage()
   const label = open ? 'Inscrições abertas' : enabled ? 'Fora do prazo' : 'Desativado'
   return <span className={`verdant-status ${open ? 'is-open' : enabled ? 'is-scheduled' : ''}`}>{translate(label)}</span>
-}
-
-type ColumnFilterOption = { value: string; label: string }
-
-function ColumnFilterControl({
-  label,
-  value,
-  onChange,
-  placeholder,
-  options,
-}: {
-  label: string
-  value: string
-  onChange: (value: string) => void
-  placeholder?: string
-  options?: ColumnFilterOption[]
-}) {
-  const { translate } = useLanguage()
-  const [open, setOpen] = useState(false)
-  return <div className='verdant-column-filter'>
-    <button type='button' className={`verdant-column-filter-trigger ${value ? 'active' : ''}`} aria-expanded={open} onClick={() => setOpen((current) => !current)}>
-      <ListFilter size={14} /><LocalizedText text={label} />{value && <span className='verdant-filter-dot' />}
-    </button>
-    {open && <div className='verdant-column-filter-input'>
-      {options
-        ? <select aria-label={`${translate('Filtrar')}: ${translate(label)}`} value={value} onChange={(event) => onChange(event.target.value)}>{options.map((option) => <option key={option.value || 'all'} value={option.value}>{translate(option.label)}</option>)}</select>
-        : <input type='search' aria-label={`${translate('Filtrar')}: ${translate(label)}`} value={value} onChange={(event) => onChange(event.target.value)} placeholder={translate(placeholder || `Filtrar ${label.toLowerCase()}`)} />}
-      {value && <button type='button' className='verdant-column-filter-clear' onClick={() => onChange('')}>{<LocalizedText text='Limpar' />}</button>}
-    </div>}
-  </div>
-}
-
-function SortButton({
-  label,
-  active,
-  direction,
-  onClick,
-}: {
-  label: ReactNode
-  active: boolean
-  direction: SortDirection
-  onClick: () => void
-}) {
-  return <button type='button' className='verdant-sort-header' onClick={onClick}>
-    <span>{label}</span>
-    <span className='verdant-sort-indicator' aria-hidden='true'>{active ? direction === 'asc' ? '↑' : '↓' : '↕'}</span>
-  </button>
-}
-
-function SortableTableHeader({ label, active, direction, onClick }: {
-  label: ReactNode
-  active: boolean
-  direction: SortDirection
-  onClick: () => void
-}) {
-  return <th aria-sort={active ? direction === 'asc' ? 'ascending' : 'descending' : 'none'}><SortButton label={label} active={active} direction={direction} onClick={onClick} /></th>
 }
 
 function DashboardLinkCard() {
@@ -1578,7 +1523,7 @@ function PeoplePage({ kind, data, update }: { kind: Person['kind']; data: Verdan
   const [filters, setFilters] = useState({ name: '', phone: '', email: '', social: '', event: '', status: '' })
   const [sortKey, setSortKey] = useState<PeopleSortKey>('name')
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
-  const activeEvents = data.events.filter((event) => event.active).sort((a, b) => a.date.localeCompare(b.date))
+  const activeEvents = [...data.events].sort((a, b) => a.date.localeCompare(b.date))
   const allPeople = data.people.filter((person) => person.kind === kind)
   const filteredPeople = allPeople.filter((person) => {
     if (filters.name && !person.name.toLowerCase().includes(filters.name.toLowerCase())) return false
@@ -1631,7 +1576,7 @@ function PeoplePage({ kind, data, update }: { kind: Person['kind']; data: Verdan
         <ColumnFilterControl label='WhatsApp' placeholder='Filtrar telefone' value={filters.phone} onChange={(value) => setFilters((current) => ({ ...current, phone: value }))} />
         <ColumnFilterControl label='E-mail' placeholder='Filtrar e-mail' value={filters.email} onChange={(value) => setFilters((current) => ({ ...current, email: value }))} />
         <ColumnFilterControl label={kind === 'DJ' ? 'Observações / pista' : 'Instagram'} placeholder={kind === 'DJ' ? 'Filtrar observações' : 'Filtrar perfil'} value={filters.social} onChange={(value) => setFilters((current) => ({ ...current, social: value }))} />
-        <ColumnFilterControl label='Eventos vinculados' value={filters.event} onChange={(value) => setFilters((current) => ({ ...current, event: value }))} options={[{ value: '', label: 'Todos os eventos' }, { value: 'linked', label: 'Com evento vinculado' }, { value: 'unlinked', label: 'Sem evento vinculado' }, ...activeEvents.map((event) => ({ value: event.id, label: event.name }))]} />
+        <ColumnFilterControl label='Eventos vinculados' value={filters.event} onChange={(value) => setFilters((current) => ({ ...current, event: value }))} options={[{ value: '', label: 'Todos os eventos' }, { value: 'linked', label: 'Com evento vinculado' }, { value: 'unlinked', label: 'Sem evento vinculado' }, ...activeEvents.map((event) => ({ value: event.id, label: `${compactDate(event.date)} · ${event.name}` }))]} />
         <ColumnFilterControl label='Status' value={filters.status} onChange={(value) => setFilters((current) => ({ ...current, status: value }))} options={[{ value: '', label: 'Todos os status' }, { value: 'active', label: 'Ativo' }, { value: 'inactive', label: 'Inativo' }]} />
       </div>
       <div className='verdant-person-table-scroll'>
@@ -1665,7 +1610,7 @@ function PersonEditor({ person, events, people, update }: { person: Person; even
     setDetails(person.eventDetails ?? {})
     setProfile({ name: person.name, phone: person.phone, email: person.email, instagram: person.instagram, notes: person.notes, pixKey: person.pixKey || '', beneficiaryName: person.beneficiaryName || '' })
   }, [person])
-  const linkedCount = eventIds.filter((id) => events.some((event) => event.id === id && event.active)).length
+  const linkedCount = eventIds.filter((id) => events.some((event) => event.id === id)).length
 
   function toggleEvent(id: string) {
     const adding = !eventIds.includes(id)

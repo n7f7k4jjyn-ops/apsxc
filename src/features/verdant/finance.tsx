@@ -1,3 +1,5 @@
+import { ColumnFilterControl, SortableTableHeader } from './list-controls'
+import { sortRows, type SortDirection } from './data'
 import {
   useEffect,
   useMemo,
@@ -260,6 +262,9 @@ function AdminFinance() {
   const [status, setStatus] = useState('')
   const [category, setCategory] = useState('')
   const [search, setSearch] = useState('')
+  const [sortKey, setSortKey] = useState<'description' | 'event' | 'type' | 'amountCents' | 'dueDate' | 'status'>('dueDate')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
+  function toggleColumn(key: typeof sortKey) { setSortDirection(sortKey === key && sortDirection === 'asc' ? 'desc' : 'asc'); setSortKey(key) }
   const [draft, setDraft] = useState<FinanceDraft | null>(null)
   const [editingId, setEditingId] = useState('')
   const [amount, setAmount] = useState('')
@@ -562,7 +567,7 @@ function AdminFinance() {
       (!from || entry.dueDate >= from) &&
       (!to || entry.dueDate <= to)
   )
-  const visible = tab === 'cash' ? (report?.cash || []).filter(matches) : ledger
+  const visible = sortRows(tab === 'cash' ? (report?.cash || []).filter(matches) : ledger, entry => sortKey === 'event' ? data?.events.find(event => event.id === entry.eventId)?.name : sortKey === 'description' ? `${entry.description} ${entry.counterparty}` : sortKey === 'type' ? `${financeTypes[entry.type]} ${financeCategories[entry.category]}` : sortKey === 'status' ? `${financeStatuses[entry.status]} ${entry.settledDate}` : entry[sortKey], sortDirection)
   const editing = data?.entries.find((entry) => entry.id === editingId)
   const editable = !editing || editing.status === 'pending'
   const selected = data?.beneficiaries.find(
@@ -781,56 +786,13 @@ function AdminFinance() {
         </div>
         {tab === 'influencer-payouts' ? <InfluencerCommissionsPanel onChanged={() => void load()} /> : tab === 'influencer-report' ? <InfluencerPayoutReportPanel eventId={eventId || undefined} from={from} to={to} /> : tab === 'summary' ? <ZigEventSummary from={from} to={to} /> : (
         <>
-        <div className='finance-grid'>
-          <Field id='finance-type-filter' label='Filtrar tipo'>
-            <select
-              id='finance-type-filter'
-              value={type}
-              onChange={(e) => setType(e.target.value)}
-            >
-              <option value=''>Todos</option>
-              {Object.entries(financeTypes).map(([key, label]) => (
-                <option key={key} value={key}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field id='finance-status-filter' label='Filtrar situação'>
-            <select
-              id='finance-status-filter'
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-            >
-              <option value=''>Todas</option>
-              {Object.entries(financeStatuses).map(([key, label]) => (
-                <option key={key} value={key}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field id='finance-category-filter' label='Filtrar categoria'>
-            <select
-              id='finance-category-filter'
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-            >
-              <option value=''>Todas</option>
-              {Object.entries(financeCategories).map(([key, label]) => (
-                <option key={key} value={key}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field id='finance-search' label='Buscar lançamento'>
-            <Input
-              id='finance-search'
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </Field>
+        <div className='verdant-column-filter-bar' aria-label='Filtrar lançamentos por coluna'>
+          <ColumnFilterControl label='Descrição / favorecido' value={search} onChange={setSearch} placeholder='Buscar lançamento ou favorecido' />
+          <ColumnFilterControl label='Tipo' value={type} onChange={setType} options={[{ value: '', label: 'Todos os tipos' }, ...Object.entries(financeTypes).map(([value, label]) => ({ value, label }))]} />
+          <ColumnFilterControl label='Situação' value={status} onChange={setStatus} options={[{ value: '', label: 'Todas as situações' }, ...Object.entries(financeStatuses).map(([value, label]) => ({ value, label }))]} />
+          <ColumnFilterControl label='Categoria' value={category} onChange={setCategory} options={[{ value: '', label: 'Todas as categorias' }, ...Object.entries(financeCategories).map(([value, label]) => ({ value, label }))]} />
+          <ColumnFilterControl label='Evento' value={eventId} onChange={setEventId} options={[{ value: '', label: 'Todos os eventos' }, ...eventOptions.map(event => ({ value: event.id, label: eventLabel(event) }))]} />
+          {(search || type || status || category || eventId) && <Button variant='ghost' size='sm' onClick={() => { setSearch(''); setType(''); setStatus(''); setCategory(''); setEventId('') }}>Limpar filtros das colunas</Button>}
         </div>
         {valid && !reportError && (
           <div className='finance-table'>
@@ -864,11 +826,12 @@ function AdminFinance() {
               <thead>
                 <tr>
                   <th>Sel.</th>
-                  <th>Descrição / favorecido</th>
-                  <th>Tipo / categoria</th>
-                  <th>Valor</th>
-                  <th>Vencimento</th>
-                  <th>Situação / baixa</th>
+                  <SortableTableHeader label='Descrição / favorecido' active={sortKey === 'description'} direction={sortDirection} onClick={() => toggleColumn('description')} />
+                  <SortableTableHeader label='Evento' active={sortKey === 'event'} direction={sortDirection} onClick={() => toggleColumn('event')} />
+                  <SortableTableHeader label='Tipo / categoria' active={sortKey === 'type'} direction={sortDirection} onClick={() => toggleColumn('type')} />
+                  <SortableTableHeader label='Valor' active={sortKey === 'amountCents'} direction={sortDirection} onClick={() => toggleColumn('amountCents')} />
+                  <SortableTableHeader label='Vencimento' active={sortKey === 'dueDate'} direction={sortDirection} onClick={() => toggleColumn('dueDate')} />
+                  <SortableTableHeader label='Situação / baixa' active={sortKey === 'status'} direction={sortDirection} onClick={() => toggleColumn('status')} />
                   <th>Ações</th>
                 </tr>
               </thead>
@@ -887,6 +850,7 @@ function AdminFinance() {
                       {entry.description}
                       <small>{entry.counterparty}</small>
                     </td>
+                    <td>{data?.events.find(event => event.id === entry.eventId)?.name || 'Sem evento'}</td>
                     <td>
                       {financeTypes[entry.type]}
                       <small>{financeCategories[entry.category]}</small>
