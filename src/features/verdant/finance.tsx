@@ -34,6 +34,7 @@ import {
   type FinanceEntry,
 } from './finance-data'
 import './finance.css'
+import { ZigEventSummary } from './zig-event-summary'
 
 const blank = (): FinanceDraft => ({
   externalId: `manual:${crypto.randomUUID()}`,
@@ -239,7 +240,7 @@ function AdminFinance() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [conflict, setConflict] = useState(false)
-  const [tab, setTab] = useState<'ledger' | 'cash'>('ledger')
+  const [tab, setTab] = useState<'ledger' | 'cash' | 'summary'>('ledger')
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [eventId, setEventId] = useState('')
@@ -688,13 +689,22 @@ function AdminFinance() {
             Caixa / relatório
           </Button>
           <Button
+            variant={tab === 'summary' ? 'default' : 'outline'}
+            aria-pressed={tab === 'summary'}
+            onClick={() => setTab('summary')}
+          >
+            Resumo financeiro
+          </Button>
+          <Button
             variant='outline'
-            disabled={!report || busy}
+            disabled={!report || busy || tab === 'summary'}
             onClick={exportCsv}
           >
             Exportar CSV
           </Button>
         </div>
+        {tab === 'summary' ? <ZigEventSummary /> : (
+        <>
         <div className='finance-grid'>
           <Field id='finance-type-filter' label='Filtrar tipo'>
             <select
@@ -842,6 +852,8 @@ function AdminFinance() {
             </table>
             {!visible.length && <p>Nenhum lançamento neste filtro.</p>}
           </div>
+        )}
+        </>
         )}
       </Card>
       <Card className='finance-panel'>
