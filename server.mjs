@@ -1946,7 +1946,9 @@ const server = createServer(async (request, response) => {
       return sendJson(response, 200, { settings: integrationSettingsForAdmin(settings) })
     }
     if (url.pathname.startsWith('/api/admin/zig/')) {
-      if (!(await requireCapability(request, response, 'zig:manage'))) return
+      const zigUser = await requireCapability(request, response, 'zig:manage')
+      if (!zigUser) return
+      if (!isMasterAdminAccount(zigUser)) return sendJson(response, 403, { error: 'A integração Zig é restrita ao administrador master.' })
       response.setHeader('Cache-Control', 'no-store')
       const route = url.pathname.slice('/api/admin/zig/'.length)
       try {

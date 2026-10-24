@@ -54,6 +54,10 @@ const shortcutAppNames = new Set(['WhatsApp', 'Gmail', 'Telegram'])
 export function Apps() {
   const { translate } = useLanguage()
   const isAdmin = useAuthStore((state) => state.auth.user?.role.includes('admin') ?? false)
+  const isZigMaster = useAuthStore((state) => {
+    const user = state.auth.user
+    return user?.username?.trim().toLowerCase() === 'eibrnof' || user?.email?.trim().toLowerCase() === 'brn@scopedeal.com.br'
+  })
   const {
     filter = '',
     type = 'all',
@@ -209,7 +213,7 @@ export function Apps() {
             <Button type='submit' disabled={settingsSaving}>{settingsSaving ? translate('Salvando…') : translate('Salvar configurações')}</Button>
           </form>}
         </details>}
-        {isAdmin && <details id='zig' className='rounded-lg border p-4'>
+        {isAdmin && isZigMaster && <details id='zig' className='rounded-lg border p-4'>
           <summary className='cursor-pointer font-semibold'>Zig: conexão e prévia de clientes (somente consulta)</summary>
           <div className='mt-4'><ZigIntegration /></div>
         </details>}

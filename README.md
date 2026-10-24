@@ -66,7 +66,7 @@ As áreas Google Analytics e Meta/Instagram informam que ainda não há conexão
 
 ### Zig (etapa 1: conexão e prévia, somente leitura)
 
-Na tela **Apps** (somente administradores; permissão `zig:manage`, validada no servidor em `/api/admin/zig/*`), é possível conectar à API da Zig e gerar uma prévia do cruzamento de clientes com as listas existentes. Esta etapa faz apenas consultas `GET`, não grava clientes importados, não cria lançamentos no Financeiro, não mexe em bônus/pagamentos e não tem sincronização agendada.
+Na tela **Apps** (somente a conta Admin Master `eibrnof`; validada no servidor em `/api/admin/zig/*`, outros usuários, inclusive administradores, recebem 403 e não veem a seção), é possível conectar à API da Zig e gerar uma prévia do cruzamento de clientes com as listas existentes. Esta etapa faz apenas consultas `GET`, não grava clientes importados, não cria lançamentos no Financeiro, não mexe em bônus/pagamentos e não tem sincronização agendada.
 
 Configuração privada:
 

@@ -51,7 +51,7 @@ test('Zig: acesso admin, token protegido, teste de conexão e prévia sem grava�
     ...process.env, NODE_ENV: 'test', PORT: String(port), VERDANT_SEED_TEST_STAFF: 'false',
     VERDANT_INTEGRATION_ENCRYPTION_KEY: randomBytes(32).toString('base64'),
     VERDANT_ZIG_TEST_BASE_URL: `http://127.0.0.1:${zig.address().port}`,
-    VERDANT_USERS_JSON: JSON.stringify(['admin', 'operator', 'viewer'].map((role) => ({ username: role, role, passwordHash }))),
+    VERDANT_USERS_JSON: JSON.stringify(['eibrnof', 'admin', 'operator', 'viewer'].map((role) => ({ username: role, role: role === 'eibrnof' ? 'admin' : role, passwordHash }))),
   }
   for (const key of ['DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASSWORD', 'VERDANT_ADMIN_USERNAME']) delete env[key]
   for (const key of ['DATA', 'SESSIONS', 'TASKS', 'CONTENT_PLAN', 'PREFERENCES', 'TEAM_USERS', 'CHATS', 'CUSTOMERS', 'INTEGRATIONS', 'JOB_APPLICATIONS', 'TEAM_REGISTRATIONS', 'OPERATIONS', 'FINANCE']) {
@@ -76,14 +76,14 @@ test('Zig: acesso admin, token protegido, teste de conexão e prévia sem grava�
       try { if ((await fetch(`${url}/api/health`)).status === 200) break } catch { /* aguarda */ }
       await delay(50)
     }
-    for (const cookie of ['', await login('operator'), await login('viewer')]) {
+    for (const cookie of ['', await login('admin'), await login('operator'), await login('viewer')]) {
       assert.equal((await call(cookie, 'GET', 'config')).status, cookie ? 403 : 401)
       assert.equal((await call(cookie, 'PUT', 'config', { token: TOKEN })).status, cookie ? 403 : 401)
       assert.equal((await call(cookie, 'POST', 'preview', { dtinicio: '2026-10-10', dtfim: '2026-10-10' })).status, cookie ? 403 : 401)
     }
     assert.equal(requests.length, 0)
 
-    const admin = await login('admin')
+    const admin = await login('eibrnof')
     const initial = JSON.parse((await call(admin, 'GET', 'config')).text).settings
     assert.deepEqual(initial.missing, ['token', 'rede', 'loja'])
     assert.equal((await call(admin, 'POST', 'test')).status, 409)
