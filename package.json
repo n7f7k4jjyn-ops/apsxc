@@ -9,7 +9,7 @@
     "start": "node server.mjs",
     "auth:hash": "node scripts/hash-password.mjs",
     "lint": "eslint .",
-    "test:server": "node tests/server.integration.test.mjs && node lib/public-form-meta.test.mjs && node lib/registry.test.mjs && node lib/rosters.test.mjs && node --test lib/finance.test.mjs test[...],
+    "test:server": "node tests/server.integration.test.mjs && node lib/public-form-meta.test.mjs && node lib/registry.test.mjs && node lib/rosters.test.mjs && node --test lib/finance.test.mjs tests/finance.integration.test.mjs",
     "preview": "vite preview",
     "format:check": "prettier --check .",
     "format": "prettier --write .",
