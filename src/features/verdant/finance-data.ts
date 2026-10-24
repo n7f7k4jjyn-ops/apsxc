@@ -1,7 +1,7 @@
 export type FinanceDraft = {
   externalId: string
   type: 'payable' | 'receivable'
-  category: 'general' | 'team' | 'dj'
+  category: 'general' | 'team' | 'dj' | 'sales'
   description: string
   counterparty: string
   beneficiaryId: string
@@ -36,7 +36,7 @@ export type FinanceData = {
 }
 
 export const financeTypes = { payable: 'A pagar', receivable: 'A receber' }
-export const financeCategories = { general: 'Geral', team: 'Equipe', dj: 'DJ' }
+export const financeCategories = { general: 'Geral', team: 'Equipe', dj: 'DJ', sales: 'Vendas Zig' }
 export const financeStatuses = {
   pending: 'Pendente',
   settled: 'Baixado',
@@ -244,6 +244,9 @@ export function parseFinanceCsv(
           equipe: 'team',
           team: 'team',
           dj: 'dj',
+          vendas: 'sales',
+          'vendas zig': 'sales',
+          sales: 'sales',
         },
         'Categoria'
       )
@@ -293,7 +296,9 @@ export function parseFinanceCsv(
       if (!description) throw new Error('Descrição obrigatória.')
       let beneficiaryId = get('beneficiaryId')
       let counterparty = get('counterparty')
-      if (category !== 'general') {
+      if (category === 'sales' && type !== 'receivable')
+        throw new Error('Vendas Zig devem ser contas a receber.')
+      if (category === 'team' || category === 'dj') {
         if (type !== 'payable')
           throw new Error('Equipe e DJs devem ser contas a pagar.')
         const matches = beneficiaries.filter(
@@ -310,7 +315,7 @@ export function parseFinanceCsv(
         beneficiaryId = matches[0].id
         counterparty = matches[0].name
       } else if (beneficiaryId) {
-        throw new Error('Categoria geral não deve ter beneficiario_id.')
+        throw new Error('Esta categoria não deve ter beneficiario_id.')
       }
       if (!counterparty) throw new Error('Favorecido obrigatório.')
       return {

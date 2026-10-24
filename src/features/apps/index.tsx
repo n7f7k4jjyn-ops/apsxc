@@ -23,6 +23,7 @@ import { useAuthStore } from '@/stores/auth-store'
 import { apps } from './data/apps'
 import { ZigIntegration } from './zig-integration'
 import { EventMerge } from './event-merge'
+import { ZigSalesConversion } from './zig-sales-conversion'
 
 const route = getRouteApi('/_authenticated/apps/')
 
@@ -216,7 +217,7 @@ export function Apps() {
         </details>}
         {isAdmin && isZigMaster && <details id='zig' className='rounded-lg border p-4'>
           <summary className='cursor-pointer font-semibold'>Zig: conexão e prévia de clientes (somente consulta)</summary>
-          <div className='mt-4'><ZigIntegration /></div>
+          <div className='mt-4 space-y-4'><ZigIntegration /><ZigSalesConversion /></div>
         </details>}
         {isAdmin && isZigMaster && <details id='mesclar-eventos' className='rounded-lg border p-4'>
           <summary className='cursor-pointer font-semibold'>Mesclar eventos duplicados</summary>
