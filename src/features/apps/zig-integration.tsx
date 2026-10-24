@@ -116,6 +116,7 @@ export function ZigIntegration() {
   const [preview, setPreview] = useState<Preview | null>(null)
   const [report, setReport] = useState<Report | null>(null)
   const [pending, setPending] = useState<PendingItem[]>([])
+  const [selected, setSelected] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     let active = true
@@ -205,6 +206,21 @@ export function ZigIntegration() {
     toast.success('Pendência resolvida.')
   }
 
+  async function resolveBulk(action: 'link' | 'create' | 'ignore') {
+    const keys = pending.filter((item) => item.status === 'open' && selected.has(item.key)).map((item) => item.key)
+    if (!keys.length) return
+    const labels = { link: 'vincular ao cliente sugerido (só os que têm exatamente um)', create: 'criar como novos clientes', ignore: 'ignorar' }
+    if (!window.confirm(`Aplicar em ${keys.length} pendência(s): ${labels[action]}?\n\nNada é apagado. Um backup é gerado antes de gravar.`)) return
+    const result = await run('resolve', () => api<{ done: string[]; failed: { key: string; error: string }[] }>('pending/resolve-bulk', { method: 'POST', body: JSON.stringify({ action, keys }) }))
+    if (!result) return
+    const status = { link: 'linked', create: 'created', ignore: 'ignored' }[action] as PendingItem['status']
+    const done = new Set(result.done)
+    setPending((items) => items.map((item) => done.has(item.key) ? { ...item, status } : item))
+    setSelected(new Set(result.failed.map((failure) => failure.key)))
+    if (result.failed.length) toast.error(`${result.done.length} resolvida(s); ${result.failed.length} não puderam ser resolvidas: ${result.failed[0].error}`)
+    else toast.success(`${result.done.length} pendência(s) resolvida(s).`)
+  }
+
   if (loadError) return <p role='alert' className='text-sm text-destructive'>{loadError}</p>
   if (!settings) return <p className='text-sm text-muted-foreground'>Carregando configuração da Zig…</p>
   const ready = settings.missing.length === 0
@@ -259,10 +275,22 @@ export function ZigIntegration() {
         <details open className='rounded-md border p-3'>
           <summary className='cursor-pointer text-sm font-medium'>Pendências de divergência ({pending.filter((item) => item.status === 'open').length})</summary>
           <p className='pt-2 text-xs text-muted-foreground'>Nada foi gravado para estas pessoas. Escolha vincular a um cliente sugerido, criar como novo ou ignorar. A decisão fica salva e não reaparece.</p>
+          <div className='flex flex-wrap items-center gap-2 pt-3 text-xs'>
+            <label className='flex items-center gap-1'>
+              <input type='checkbox' checked={selected.size > 0 && pending.filter((item) => item.status === 'open').every((item) => selected.has(item.key))} onChange={(event) => setSelected(event.target.checked ? new Set(pending.filter((item) => item.status === 'open').map((item) => item.key)) : new Set())} />
+              Selecionar todas ({selected.size})
+            </label>
+            <Button type='button' size='sm' variant='outline' disabled={busy !== '' || !selected.size} onClick={() => void resolveBulk('link')}>Vincular selecionadas</Button>
+            <Button type='button' size='sm' variant='outline' disabled={busy !== '' || !selected.size} onClick={() => void resolveBulk('create')}>Criar selecionadas como novas</Button>
+            <Button type='button' size='sm' variant='ghost' disabled={busy !== '' || !selected.size} onClick={() => void resolveBulk('ignore')}>Ignorar selecionadas</Button>
+          </div>
           <ul className='max-h-96 space-y-2 overflow-auto pt-3 text-xs'>
             {pending.filter((item) => item.status === 'open').map((item) => (
               <li key={item.key} className='space-y-1 rounded border p-2'>
-                <p className='font-medium'>{item.name || '(sem nome)'} <span className='font-normal text-muted-foreground'>· ID Zig {item.zigId ?? '—'} · {item.phone.raw || 'sem telefone'}{item.documentMasked ? ` · doc ${item.documentMasked}` : ''}</span></p>
+                <label className='flex items-start gap-2 font-medium'>
+                  <input type='checkbox' className='mt-0.5' checked={selected.has(item.key)} onChange={(event) => setSelected((current) => { const next = new Set(current); if (event.target.checked) next.add(item.key); else next.delete(item.key); return next })} aria-label={`Selecionar ${item.name || item.zigId || 'pendência'}`} />
+                  <span>{item.name || '(sem nome)'} <span className='font-normal text-muted-foreground'>· ID Zig {item.zigId ?? '—'} · {item.phone.raw || 'sem telefone'}{item.documentMasked ? ` · doc ${item.documentMasked}` : ''}</span></span>
+                </label>
                 <p className='text-amber-700 dark:text-amber-300'>{item.reasons.map((reason) => reasonLabels[reason] ?? reason).join(', ')}</p>
                 <div className='flex flex-wrap gap-2'>
                   {item.matches.filter((match) => match.source === 'customer').map((match) => (

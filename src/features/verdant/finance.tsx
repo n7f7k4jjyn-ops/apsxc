@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ChangeEvent,
@@ -85,6 +86,8 @@ function draftFields(entry: FinanceDraft): FinanceDraft {
 }
 const dateLabel = (date: string) =>
   date ? date.split('-').reverse().join('/') : '—'
+const eventLabel = (event: { name: string; date: string; active?: boolean }) =>
+  `${event.date.slice(8, 10)}/${event.date.slice(5, 7)} · ${event.name}${event.active === false ? ' (inativo)' : ''}`
 const message = (cause: unknown) =>
   cause instanceof Error
     ? cause.message
@@ -241,6 +244,12 @@ function AdminFinance() {
   const [notice, setNotice] = useState('')
   const [conflict, setConflict] = useState(false)
   const [tab, setTab] = useState<'ledger' | 'cash' | 'summary'>('ledger')
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkEvent, setBulkEvent] = useState('')
+  const eventOptions = useMemo(
+    () => [...(data?.events ?? [])].sort((a, b) => Number(a.active === false) - Number(b.active === false) || a.date.localeCompare(b.date) || a.name.localeCompare(b.name)),
+    [data?.events]
+  )
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [eventId, setEventId] = useState('')
@@ -384,6 +393,39 @@ function AdminFinance() {
         } else setError(message(cause))
       }
       return false
+    } finally {
+      lock.current = false
+      if (active.current) setBusy(false)
+    }
+  }
+  async function bulkLink() {
+    if (disabled || lock.current || !data || !selectedIds.size) return
+    if (!window.confirm(`Vincular ${selectedIds.size} lançamento(s) a ${bulkEvent ? 'este evento' : 'nenhum evento'}? Nenhum valor é alterado; o histórico registra a mudança.`)) return
+    lock.current = true
+    setBusy(true)
+    setError('')
+    setNotice('')
+    try {
+      const response = await fetch('/api/finance', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ revision: data.revision, bulk: { ids: [...selectedIds], eventId: bulkEvent } }),
+      })
+      const result = await response.json()
+      if (response.status === 409) {
+        setConflict(true)
+        setError('Os dados foram alterados por outra pessoa. Recarregamos a versão atual; selecione de novo e reaplique.')
+        await load()
+        return
+      }
+      if (!response.ok) throw new Error(result.error || 'Não foi possível vincular em massa.')
+      if (!isLedger(result)) throw new Error('Resposta da gravação inválida.')
+      setData((current) => current && { ...current, revision: result.revision, entries: result.entries })
+      setSelectedIds(new Set())
+      setNotice(`${(result as { updated?: number }).updated ?? 0} lançamento(s) vinculado(s); ${result.skipped ?? 0} já estavam nesse evento.`)
+    } catch (cause) {
+      setError(message(cause))
     } finally {
       lock.current = false
       if (active.current) setBusy(false)
@@ -623,9 +665,9 @@ function AdminFinance() {
               onChange={(e) => setEventId(e.target.value)}
             >
               <option value=''>Todos os eventos</option>
-              {data?.events.map((event) => (
+              {eventOptions.map((event) => (
                 <option key={event.id} value={event.id}>
-                  {event.name} · {dateLabel(event.date)}
+                  {eventLabel(event)}
                 </option>
               ))}
             </select>
@@ -758,6 +800,27 @@ function AdminFinance() {
         </div>
         {valid && !reportError && (
           <div className='finance-table'>
+            <div className='finance-actions'>
+              <label>
+                <input
+                  type='checkbox'
+                  checked={visible.length > 0 && visible.every((entry) => selectedIds.has(entry.id))}
+                  onChange={(e) => setSelectedIds(e.target.checked ? new Set(visible.map((entry) => entry.id)) : new Set())}
+                />{' '}
+                Selecionar todos do filtro ({selectedIds.size})
+              </label>
+              <select aria-label='Evento para vincular' value={bulkEvent} onChange={(e) => setBulkEvent(e.target.value)}>
+                <option value=''>Sem evento</option>
+                {eventOptions.map((event) => (
+                  <option key={event.id} value={event.id}>
+                    {eventLabel(event)}
+                  </option>
+                ))}
+              </select>
+              <Button variant='outline' disabled={disabled || !selectedIds.size} onClick={() => void bulkLink()}>
+                Vincular evento às selecionadas
+              </Button>
+            </div>
             <table>
               <caption>
                 {tab === 'cash'
@@ -766,6 +829,7 @@ function AdminFinance() {
               </caption>
               <thead>
                 <tr>
+                  <th>Sel.</th>
                   <th>Descrição / favorecido</th>
                   <th>Tipo / categoria</th>
                   <th>Valor</th>
@@ -777,6 +841,14 @@ function AdminFinance() {
               <tbody>
                 {visible.map((entry) => (
                   <tr key={entry.id}>
+                    <td>
+                      <input
+                        type='checkbox'
+                        aria-label={`Selecionar ${entry.description}`}
+                        checked={selectedIds.has(entry.id)}
+                        onChange={(e) => setSelectedIds((current) => { const next = new Set(current); if (e.target.checked) next.add(entry.id); else next.delete(entry.id); return next })}
+                      />
+                    </td>
                     <td>
                       {entry.description}
                       <small>{entry.counterparty}</small>

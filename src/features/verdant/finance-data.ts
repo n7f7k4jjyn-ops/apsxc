@@ -32,7 +32,7 @@ export type FinanceData = {
   revision: number
   entries: FinanceEntry[]
   beneficiaries: FinanceBeneficiary[]
-  events: { id: string; name: string; date: string }[]
+  events: { id: string; name: string; date: string; active?: boolean }[]
 }
 
 export const financeTypes = { payable: 'A pagar', receivable: 'A receber' }

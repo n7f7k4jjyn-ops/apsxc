@@ -522,7 +522,7 @@ async function financeReferences() {
       ...team.map(person => ({ id: `team:${person.id}`, name: person.name, kind: 'team', ...(person.pixKey ? { pixKey: person.pixKey } : {}) })),
       ...(state.people || []).filter(person => person.kind === 'DJ').map(person => ({ id: `dj:${person.id}`, name: person.name, kind: 'dj' })),
     ],
-    events: state.events.map(event => ({ id: event.id, name: event.name, date: event.date, eventTime: event.eventTime })),
+    events: state.events.map(event => ({ id: event.id, name: event.name, date: event.date, eventTime: event.eventTime, active: event.active !== false })),
   }
 }
 
@@ -2305,6 +2305,26 @@ const server = createServer(async (request, response) => {
           const value = await bodyJson(request)
           if (typeof value?.key !== 'string' || !['link', 'create', 'ignore'].includes(value?.action)) return sendJson(response, 400, { error: 'Informe a pendência e a ação (link, create ou ignore).' })
           return sendJson(response, 200, await resolveZigPending(value.key, value.action, String(value.customerId || '')))
+        }
+        if (route === 'pending/resolve-bulk' && request.method === 'POST') {
+          const value = await bodyJson(request)
+          const keys = Array.isArray(value?.keys) ? [...new Set(value.keys.filter((key) => typeof key === 'string'))] : []
+          if (!['link', 'create', 'ignore'].includes(value?.action) || !keys.length || keys.length > 1000) return sendJson(response, 400, { error: 'Informe a ação (link, create ou ignore) e de 1 a 1000 pendências.' })
+          const store = await readZigPending()
+          const done = []
+          const failed = []
+          for (const key of keys) {
+            const item = store.items.find((entry) => entry.key === key)
+            if (!item || item.status !== 'open') { failed.push({ key, error: 'Pendência não está mais aberta.' }); continue }
+            let customerId = ''
+            if (value.action === 'link') {
+              const candidates = (item.matches || []).filter((match) => match.source === 'customer')
+              if (candidates.length !== 1) { failed.push({ key, error: 'Vínculo em massa só vale com exatamente um cliente sugerido.' }); continue }
+              customerId = String(candidates[0].id)
+            }
+            try { await resolveZigPending(key, value.action, customerId); done.push(key) } catch (error) { failed.push({ key, error: error instanceof Error ? error.message : 'Falha ao resolver.' }) }
+          }
+          return sendJson(response, 200, { done, failed })
         }
       } catch (error) {
         return sendZigError(response, error)
