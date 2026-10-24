@@ -168,6 +168,9 @@ test('Zig: acesso admin, token protegido, teste de conexão e prévia sem grava�
     const pending = JSON.parse((await call(admin, 'GET', 'pending')).text)
     assert.deepEqual(pending.items, [])
     assert.equal((await call(admin, 'POST', 'pending/resolve', { key: 'inexistente', action: 'ignore' })).status, 404)
+    const bulkMissing = JSON.parse((await call(admin, 'POST', 'pending/resolve-bulk', { action: 'ignore', keys: ['inexistente'] })).text)
+    assert.deepEqual([bulkMissing.done.length, bulkMissing.failed.length], [0, 1])
+    assert.equal((await call(admin, 'POST', 'pending/resolve-bulk', { action: 'ignore', keys: [] })).status, 400)
     assert.ok(made.every((item) => item.method === 'GET') && requests.every((item) => item.method === 'GET'))
 
     const cleared = await call(admin, 'PUT', 'config', { clearToken: true })
