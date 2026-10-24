@@ -55,6 +55,7 @@ test('production import through authenticated APIs: backup, partial recovery, li
     const login = await fetch(`${base}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: 'admin', password }) })
     assert.equal(login.status, 200); cookie = login.headers.get('set-cookie').split(';', 1)[0]
     if (process.env.PRODUCTION_IMPORT_BROWSER === '1') {
+      await writeFile(env.VERDANT_CUSTOMERS_FILE, JSON.stringify([{id:'qa-client-a',name:'Cliente A',phone:'41999990001',email:''},{id:'qa-client-b',name:'Cliente B',phone:'41999990002',email:''}]))
       const finance = await api('/api/finance')
       await api('/api/finance', { revision: finance.revision, entries: [200, 1000].map((amountCents, index) => ({ externalId: `sort-test-${index}`, type: 'payable', category: 'general', description: index ? 'Ordenação dez' : 'Ordenação dois', counterparty: 'Fornecedor de teste', beneficiaryId: '', eventId: '', amountCents, dueDate: '2024-01-06', status: 'pending', settledDate: '', paymentMethod: '', notes: '' })) })
     }
@@ -127,7 +128,11 @@ test('production import through authenticated APIs: backup, partial recovery, li
       await page.locator('.verdant-column-filter-bar').getByRole('button',{name:'Data',exact:true}).click()
       await page.goto(`${base}/verdant/cadastros`)
       await page.getByRole('button',{name:'Nome',exact:true}).waitFor()
+      const sortedClients = page.waitForResponse(response=>response.url().includes('/api/registry/clients?')&&response.url().includes('dir=desc'))
       await page.getByRole('button',{name:'Nome',exact:true}).click()
+      await sortedClients
+      await page.locator('.registry-name').first().filter({hasText:'Cliente B'}).waitFor()
+      assert.equal(await page.locator('.registry-name').first().textContent(),'Cliente B')
       assert.equal(await page.getByRole('navigation',{name:'Navegação rápida do aplicativo'}).getByRole('link',{name:'DJs',exact:true}).count(),0)
       await page.goto(`${base}/verdant/escalas`)
       await page.getByRole('region',{name:'Calendário de escalas'}).waitFor()
