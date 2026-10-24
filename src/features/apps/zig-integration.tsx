@@ -35,9 +35,24 @@ type Preview = {
   events: { id: string; name: string; beginAt: string; inRequestedPeriod: boolean }[]
   totals: { checkins: number; checkinPages: number; buyers: number; zigPeople: number; unconfirmed: number; otherEventOnly: number }
   summary: { linked: number; created: number; divergent: number; tables: number; divergenceReasons: Record<string, number>; fillableFields: Record<string, number> }
+  plan: Plan
   groups: { linked: Group; created: Group; divergent: Group; tables: Group; unconfirmed: { items: Unconfirmed[]; total: number; truncated: boolean } }
 }
 type Unconfirmed = { zigId: string | null; name: string; phone: { raw: string }; reason: string; ambiguousCandidates: string[]; outsideRecords: number; ambiguousRecords: number }
+type Plan = { updates: number; creates: number; kept: number; registrationOnly: number; skipped: number; pending: number; fills: Record<string, number> }
+type Report = { backup: string; updated: number; created: number; kept: number; registrationOnly: number; skipped: number; pendingAdded: number; pendingRefreshed: number; pendingAlreadyDecided: number }
+type PendingItem = {
+  key: string
+  zigId: string | null
+  name: string
+  phone: { raw: string }
+  documentMasked: string | null
+  email: string | null
+  birthdate: string | null
+  reasons: string[]
+  matches: { source: string; id: string; name: string }[]
+  status: 'open' | 'linked' | 'created' | 'ignored'
+}
 
 const missingLabels: Record<string, string> = { token: 'token de integração', rede: 'identificador da rede', loja: 'loja Verdant' }
 const reasonLabels: Record<string, string> = {
@@ -51,6 +66,7 @@ const reasonLabels: Record<string, string> = {
   uncertain_kind: 'Dados insuficientes (pessoa ou comanda?)',
   zig_duplicate_document: 'Mesmo documento em vários cadastros Zig',
   table_tab: 'Comanda de mesa',
+  zig_possible_duplicate: 'Possível duplicidade dentro da própria Zig (mesmo telefone e nome compatível)',
 }
 
 async function api<T>(route: string, init?: RequestInit): Promise<T> {
@@ -98,6 +114,8 @@ export function ZigIntegration() {
   const [dtinicio, setDtinicio] = useState('')
   const [dtfim, setDtfim] = useState('')
   const [preview, setPreview] = useState<Preview | null>(null)
+  const [report, setReport] = useState<Report | null>(null)
+  const [pending, setPending] = useState<PendingItem[]>([])
 
   useEffect(() => {
     let active = true
@@ -110,6 +128,9 @@ export function ZigIntegration() {
       .catch((error) => {
         if (active) setLoadError(error instanceof Error ? error.message : 'Não foi possível carregar a configuração da Zig.')
       })
+    api<{ items: PendingItem[] }>('pending')
+      .then((result) => { if (active) setPending(result.items) })
+      .catch(() => undefined)
     return () => { active = false }
   }, [])
 
@@ -155,8 +176,33 @@ export function ZigIntegration() {
   async function runPreview(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setPreview(null)
+    setReport(null)
     const result = await run('preview', () => api<{ preview: Preview }>('preview', { method: 'POST', body: JSON.stringify({ dtinicio, dtfim }) }))
     if (result) setPreview(result.preview)
+  }
+
+  async function applyPreview() {
+    if (!preview) return
+    const { plan } = preview
+    const warnings = preview.warnings.length ? `\n\nAtenção:\n- ${preview.warnings.join('\n- ')}` : ''
+    const confirmed = window.confirm(
+      `Gravar agora?\n\n• ${plan.creates} clientes novos serão criados\n• ${plan.updates} clientes existentes receberão o vínculo Zig e campos vazios\n• ${plan.pending} divergências irão para a fila de Pendências (nada é gravado nelas)\n• Nada é apagado nem sobrescrito. Um backup é gerado antes.${warnings}`,
+    )
+    if (!confirmed) return
+    const result = await run('apply', () => api<{ report: Report }>('apply', { method: 'POST', body: JSON.stringify({ dtinicio, dtfim, confirm: true, expected: { updates: plan.updates, creates: plan.creates } }) }))
+    if (!result) return
+    setReport(result.report)
+    setPreview(null)
+    toast.success('Dados da Zig gravados.')
+    const refreshed = await run('pending', () => api<{ items: PendingItem[] }>('pending'))
+    if (refreshed) setPending(refreshed.items)
+  }
+
+  async function resolvePendingItem(key: string, action: 'link' | 'create' | 'ignore', customerId?: string) {
+    const result = await run('resolve', () => api<{ status: string }>('pending/resolve', { method: 'POST', body: JSON.stringify({ key, action, customerId }) }))
+    if (!result) return
+    setPending((items) => items.map((item) => item.key === key ? { ...item, status: result.status as PendingItem['status'] } : item))
+    toast.success('Pendência resolvida.')
   }
 
   if (loadError) return <p role='alert' className='text-sm text-destructive'>{loadError}</p>
@@ -165,7 +211,7 @@ export function ZigIntegration() {
 
   return (
     <div className='space-y-4'>
-      <p className='text-sm text-muted-foreground'>Etapa 1: apenas consultas (GET) à API da Zig e prévia do cruzamento com clientes e listas. Nada é gravado: nem clientes, nem lançamentos financeiros. Endereço fixo: {settings.baseUrl}</p>
+      <p className='text-sm text-muted-foreground'>Apenas consultas (GET) à API da Zig. Primeiro gere a prévia (nada é gravado); depois, se estiver correta, use Gravar: cria clientes novos, vincula o ID Zig e preenche só campos vazios. Nada é apagado ou sobrescrito, e o Financeiro não é tocado. Endereço fixo: {settings.baseUrl}</p>
       {settings.missing.length > 0 && <p role='status' className='rounded-md border border-amber-300/60 bg-amber-50/70 px-3 py-2 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100'>Falta configurar: {settings.missing.map((item) => missingLabels[item] ?? item).join(', ')}.</p>}
       {!settings.encryptionKeyConfigured && <p role='alert' className='text-sm text-destructive'>VERDANT_INTEGRATION_ENCRYPTION_KEY não está configurada no servidor; o token não poderá ser salvo.</p>}
       <form onSubmit={save} className='grid gap-4 md:grid-cols-2'>
@@ -203,6 +249,34 @@ export function ZigIntegration() {
         </div>
       </form>
 
+      {report && (
+        <p role='status' className='rounded-md border border-emerald-300/60 bg-emerald-50/70 px-3 py-2 text-sm text-emerald-950 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-100'>
+          Gravado: {report.created} clientes novos, {report.updated} atualizados, {report.kept} mantidos; {report.pendingAdded} novas pendências{report.skipped ? `; ${report.skipped} ignorados por conflito` : ''}. Backup: {report.backup}.
+        </p>
+      )}
+
+      {pending.some((item) => item.status === 'open') && (
+        <details open className='rounded-md border p-3'>
+          <summary className='cursor-pointer text-sm font-medium'>Pendências de divergência ({pending.filter((item) => item.status === 'open').length})</summary>
+          <p className='pt-2 text-xs text-muted-foreground'>Nada foi gravado para estas pessoas. Escolha vincular a um cliente sugerido, criar como novo ou ignorar. A decisão fica salva e não reaparece.</p>
+          <ul className='max-h-96 space-y-2 overflow-auto pt-3 text-xs'>
+            {pending.filter((item) => item.status === 'open').map((item) => (
+              <li key={item.key} className='space-y-1 rounded border p-2'>
+                <p className='font-medium'>{item.name || '(sem nome)'} <span className='font-normal text-muted-foreground'>· ID Zig {item.zigId ?? '—'} · {item.phone.raw || 'sem telefone'}{item.documentMasked ? ` · doc ${item.documentMasked}` : ''}</span></p>
+                <p className='text-amber-700 dark:text-amber-300'>{item.reasons.map((reason) => reasonLabels[reason] ?? reason).join(', ')}</p>
+                <div className='flex flex-wrap gap-2'>
+                  {item.matches.filter((match) => match.source === 'customer').map((match) => (
+                    <Button key={match.id} type='button' size='sm' variant='outline' disabled={busy !== ''} onClick={() => void resolvePendingItem(item.key, 'link', match.id)}>Vincular a {match.name || match.id}</Button>
+                  ))}
+                  <Button type='button' size='sm' variant='outline' disabled={busy !== ''} onClick={() => void resolvePendingItem(item.key, 'create')}>Criar como novo</Button>
+                  <Button type='button' size='sm' variant='ghost' disabled={busy !== ''} onClick={() => void resolvePendingItem(item.key, 'ignore')}>Ignorar</Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+
       {preview && (
         <div className='space-y-3'>
           <p className='text-sm'>Gerada em {new Date(preview.generatedAt).toLocaleString('pt-BR')} · {preview.events.filter((event) => event.inRequestedPeriod).map((event) => event.name).join(', ')} · {preview.totals.checkins} check-ins ({preview.totals.checkinPages} páginas), {preview.totals.buyers} compradores, {preview.totals.zigPeople} pessoas Zig. Nenhum dado foi gravado.</p>
@@ -214,6 +288,16 @@ export function ZigIntegration() {
             <div className='rounded border p-2'>Comandas de mesa<br /><strong>{preview.summary.tables}</strong></div>
           </div>
           <p className='text-xs text-muted-foreground'>Campos vazios que a Zig poderia preencher: {Object.entries(preview.summary.fillableFields).map(([field, count]) => `${field} (${count})`).join(', ') || 'nenhum'}.</p>
+          <div className='space-y-2 rounded-md border border-emerald-300/60 bg-emerald-50/50 p-3 text-sm dark:border-emerald-800 dark:bg-emerald-950/20'>
+            <p className='font-medium'>O que Gravar fará</p>
+            <ul className='list-disc pl-5 text-xs'>
+              <li>Criar {preview.plan.creates} clientes novos.</li>
+              <li>Vincular e completar {preview.plan.updates} clientes existentes (somente campos vazios{Object.keys(preview.plan.fills).length ? `: ${Object.entries(preview.plan.fills).map(([field, count]) => `${field} ${count}`).join(', ')}` : ''}).</li>
+              <li>Enviar {preview.plan.pending} divergências para Pendências, sem gravar nelas.</li>
+              <li>Manter {preview.plan.kept} já atualizados{preview.plan.registrationOnly ? `, ${preview.plan.registrationOnly} só presentes nas listas (sem cliente para completar)` : ''}{preview.plan.skipped ? `, ${preview.plan.skipped} ignorados por conflito` : ''}.</li>
+            </ul>
+            <Button type='button' disabled={busy !== ''} onClick={() => void applyPreview()}>{busy === 'apply' ? 'Gravando…' : 'Gravar'}</Button>
+          </div>
           <EntryList title='Vínculo encontrado' group={preview.groups.linked} hint='Telefone e nome compatíveis (ou documento e nome). Nenhum dado existente seria sobrescrito.' />
           <EntryList title='Cliente novo' group={preview.groups.created} />
           <EntryList title='Divergência — conferir manualmente' group={preview.groups.divergent} />
