@@ -32,7 +32,8 @@ export function Header({ className, fixed, children, ...props }: HeaderProps) {
       data-app-header=''
       className={cn(
         'z-50',
-        fixed && 'header-fixed peer/header sticky top-0 w-[inherit]',
+        fixed &&
+          'header-fixed peer/header sticky top-0 w-[inherit] bg-background/95 backdrop-blur',
         scrolled && fixed ? 'shadow' : 'shadow-none',
         className
       )}

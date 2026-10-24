@@ -1,10 +1,14 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
-import { userEvent } from 'vitest/browser'
+import { page, userEvent } from 'vitest/browser'
 import { AppQuickNav } from './app-quick-nav'
 import { PageContext } from './page-context'
+import '@/styles/index.css'
+
+const navigate = vi.fn()
 
 vi.mock('@tanstack/react-router', () => ({
+  useNavigate: () => navigate,
   useLocation: ({
     select,
   }: {
@@ -27,6 +31,11 @@ vi.mock('@/stores/auth-store', () => ({
 }))
 
 describe('page navigation context', () => {
+  beforeEach(async () => {
+    navigate.mockClear()
+    await page.viewport(1280, 720)
+  })
+
   it('shows the current title and parent breadcrumbs with click analytics', async () => {
     const listener = vi.fn()
     window.addEventListener('verdant:analytics', listener)
@@ -62,5 +71,27 @@ describe('page navigation context', () => {
     await expect
       .element(screen.getByRole('link', { name: 'Resumo', exact: true }))
       .not.toHaveAttribute('aria-current')
+  })
+
+  it('offers a touch-sized mobile selector with the current parent section', async () => {
+    await page.viewport(320, 700)
+    try {
+      const screen = await render(<AppQuickNav />)
+      const select = screen.getByRole('combobox', { name: 'Ir para página' })
+      await expect.element(select).toHaveValue('/verdant/cadastros')
+      expect(
+        select.element().getBoundingClientRect().height
+      ).toBeGreaterThanOrEqual(44)
+      expect(
+        select.element().getBoundingClientRect().width
+      ).toBeLessThanOrEqual(320)
+      await expect
+        .element(screen.getByRole('option', { name: 'Financeiro' }))
+        .not.toBeInTheDocument()
+      await userEvent.selectOptions(select, '/verdant/agenda')
+      expect(navigate).toHaveBeenCalledWith({ to: '/verdant/agenda' })
+    } finally {
+      await page.viewport(1280, 720)
+    }
   })
 })

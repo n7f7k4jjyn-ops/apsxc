@@ -13,6 +13,11 @@ export type Language = 'pt-BR' | 'en'
 const LANGUAGE_STORAGE_KEY = 'verdant-language'
 
 const english: Record<string, string> = {
+  'Navegação rápida do aplicativo': 'Quick app navigation',
+  'Ir para página': 'Go to page',
+  'Continuar neste evento': 'Continue with this event',
+  'Mais filtros': 'More filters',
+  'Buscar inscrições': 'Search registrations',
   'Nenhuma tarefa cadastrada.': 'No tasks yet.',
   'Crie uma tarefa e defina responsáveis e prazos para começar.': 'Create a task and assign owners and deadlines to get started.',
   'Criar tarefa': 'Create task',

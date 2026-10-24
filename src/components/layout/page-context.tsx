@@ -12,8 +12,13 @@ export const PageContext = memo(function PageContext() {
 
   return (
     <div className='min-w-0 border-b px-3 py-2 sm:px-4'>
-      <p className='truncate font-semibold'>{translate(page.title)}</p>
-      <nav aria-label={translate('Localização na navegação')}>
+      <p className='truncate text-sm font-semibold sm:text-base'>
+        {translate(page.title)}
+      </p>
+      <nav
+        className='hidden md:block'
+        aria-label={translate('Localização na navegação')}
+      >
         <ol className='flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground'>
           {breadcrumbs.map((item, index) => (
             <li key={item.path} className='flex items-center gap-2'>
