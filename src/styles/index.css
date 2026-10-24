@@ -33,6 +33,16 @@
   body {
     @apply min-h-svh w-full bg-background text-foreground has-[div[data-variant='inset']]:bg-sidebar;
   }
+  a:focus-visible,
+  button:focus-visible,
+  [tabindex]:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 3px;
+  }
+
+  main:focus {
+    outline: none;
+  }
 
   /* Override Radix scroll locking for sticky headers */
   body[data-scroll-locked] {
@@ -54,11 +64,11 @@
     }
 
     [data-slot='button'] {
-      min-height: 40px;
+      min-height: 44px;
     }
 
     [data-slot='button'].size-9 {
-      min-width: 40px;
+      min-width: 44px;
     }
 
     header[data-app-header] > div {
@@ -66,8 +76,13 @@
     }
 
     header[data-app-header] [data-slot='button'] {
-      min-width: 40px;
-      min-height: 40px;
+      min-width: 44px;
+      min-height: 44px;
+    }
+
+    [data-sidebar='menu-button'],
+    [data-sidebar='menu-sub-button'] {
+      min-height: 44px;
     }
   }
 }

@@ -1,6 +1,10 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { VerdantWorkspace } from '@/features/verdant'
+import { createFileRoute, redirect } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/_authenticated/verdant/respostas')({
-  component: () => <VerdantWorkspace sectionName='respostas' />,
+  beforeLoad: ({ location }) => {
+    throw redirect({
+      href: `/verdant/inscricoes${location.searchStr}${location.hash ? `#${location.hash}` : ''}`,
+      replace: true,
+    })
+  },
 })

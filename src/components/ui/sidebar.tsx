@@ -161,6 +161,7 @@ function Sidebar({
   collapsible?: 'offcanvas' | 'icon' | 'none'
 }) {
   const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
+  const mobileOpener = React.useRef<HTMLElement | null>(null)
 
   if (collapsible === 'none') {
     return (
@@ -184,7 +185,25 @@ function Sidebar({
           data-sidebar='sidebar'
           data-slot='sidebar'
           data-mobile='true'
-          className='w-(--sidebar-width) bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden'
+          className='w-(--sidebar-width) bg-sidebar p-0 text-sidebar-foreground'
+          onOpenAutoFocus={(event) => {
+            mobileOpener.current = document.activeElement as HTMLElement | null
+            const activeLink = document.querySelector<HTMLElement>('[data-mobile="true"] [aria-current="page"]')
+            if (activeLink) {
+              event.preventDefault()
+              activeLink.focus()
+            }
+          }}
+          onCloseAutoFocus={(event) => {
+            event.preventDefault()
+            const target = mobileOpener.current?.isConnected
+              ? mobileOpener.current
+              : document.querySelector<HTMLElement>('[data-slot="sidebar-trigger"]')
+            target?.focus({ preventScroll: true })
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape' && !event.defaultPrevented) setOpenMobile(false)
+          }}
           style={
             {
               '--sidebar-width': SIDEBAR_WIDTH_MOBILE,
@@ -255,12 +274,13 @@ function SidebarTrigger({
   onClick,
   ...props
 }: React.ComponentProps<typeof Button>) {
-  const { toggleSidebar } = useSidebar()
+  const { toggleSidebar, isMobile, openMobile, open } = useSidebar()
 
   return (
     <Button
       data-sidebar='trigger'
       data-slot='sidebar-trigger'
+      aria-expanded={isMobile ? openMobile : open}
       variant='ghost'
       size='icon'
       className={cn('size-7', className)}

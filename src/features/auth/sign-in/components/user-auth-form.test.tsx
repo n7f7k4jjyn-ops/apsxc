@@ -4,6 +4,7 @@ import { type Locator, userEvent } from 'vitest/browser'
 import { UserAuthForm } from './user-auth-form'
 
 const navigate = vi.fn()
+const invalidate = vi.fn().mockResolvedValue(undefined)
 const setUserMock = vi.fn()
 
 vi.mock('@/stores/auth-store', () => ({
@@ -12,7 +13,7 @@ vi.mock('@/stores/auth-store', () => ({
 
 vi.mock('@tanstack/react-router', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@tanstack/react-router')>()
-  return { ...actual, useNavigate: () => navigate }
+  return { ...actual, useRouter: () => ({ navigate, invalidate }) }
 })
 
 describe('UserAuthForm', () => {
@@ -54,7 +55,7 @@ describe('UserAuthForm', () => {
     expect(fetch).toHaveBeenCalledWith('/api/auth/login', expect.objectContaining({
       method: 'POST', credentials: 'same-origin',
     }))
-    await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith({ to: '/', replace: true }))
+    await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith({ href: '/', replace: true }))
   })
 
   it('uses a username on the Verdant login screen while keeping the same server session flow', async () => {
@@ -70,7 +71,7 @@ describe('UserAuthForm', () => {
       credentials: 'same-origin',
       body: JSON.stringify({ username: 'bruno', password: 'UmaSenhaForte2026!', rememberMe: false }),
     }))
-    await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith({ to: '/', replace: true }))
+    await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith({ href: '/', replace: true }))
   })
 
   it('remembers the username and requests a persistent session when selected', async () => {
@@ -98,5 +99,24 @@ describe('UserAuthForm', () => {
     await expect.element(screen.getByRole('alert')).toHaveTextContent('E-mail ou senha inválidos.')
     expect(setUserMock).not.toHaveBeenCalled()
     expect(navigate).not.toHaveBeenCalled()
+  })
+
+  it('returns to the intended page with its filters and fragment', async () => {
+    await screen.rerender(<UserAuthForm redirectTo='/verdant/inscricoes?event=example#lista' />)
+    await userEvent.fill(emailInput, 'equipe@verdant.test')
+    await userEvent.fill(passwordInput, 'UmaSenhaForte2026!')
+    await userEvent.click(signInButton)
+    await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith({
+      href: '/verdant/inscricoes?event=example#lista', replace: true,
+    }))
+    expect(invalidate).toHaveBeenCalledOnce()
+  })
+
+  it('rejects an external redirect after login', async () => {
+    await screen.rerender(<UserAuthForm redirectTo='/\\external.test' />)
+    await userEvent.fill(emailInput, 'equipe@verdant.test')
+    await userEvent.fill(passwordInput, 'UmaSenhaForte2026!')
+    await userEvent.click(signInButton)
+    await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith({ href: '/', replace: true }))
   })
 })

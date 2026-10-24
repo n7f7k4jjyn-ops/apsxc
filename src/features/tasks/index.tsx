@@ -5,6 +5,9 @@ import { Main } from '@/components/layout/main'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
+import { Button } from '@/components/ui/button'
+import { PageError, PageLoading } from '@/components/page-state'
+import { trackNavigation } from '@/lib/analytics'
 import { TasksDialogs } from './components/tasks-dialogs'
 import { TasksPrimaryButtons } from './components/tasks-primary-buttons'
 import { TasksProvider, useTasks } from './components/tasks-provider'
@@ -19,7 +22,7 @@ export function Tasks() {
 }
 
 function TasksContent() {
-  const { tasks, loading } = useTasks()
+  const { tasks, loading, error, reload, setOpen } = useTasks()
   return (
     <>
       <Header fixed>
@@ -38,10 +41,18 @@ function TasksContent() {
           </div>
           <TasksPrimaryButtons />
         </div>
-        {loading ? <p className='py-12 text-center text-sm text-muted-foreground'>{<LocalizedText text="Carregando tarefas salvas no servidor…" />}</p> : <TasksTable data={tasks} />}
+        {loading ? <PageLoading /> : error ? <PageError retry={() => void reload()} /> : tasks.length === 0 ? (
+          <section className='space-y-3 rounded-lg border border-dashed p-5'>
+            <h2 className='font-semibold'><LocalizedText text='Nenhuma tarefa cadastrada.' /></h2>
+            <p className='text-muted-foreground'><LocalizedText text='Crie uma tarefa e defina responsáveis e prazos para começar.' /></p>
+            <Button onClick={() => {
+              trackNavigation('cta_click', '/tasks', { action: 'create_task' })
+              setOpen('create')
+            }}><LocalizedText text='Criar tarefa' /></Button>
+          </section>
+        ) : <TasksTable data={tasks} />}
       </Main>
       <TasksDialogs />
     </>
   )
 }
-

@@ -15,6 +15,8 @@ type TasksContextType = {
   tasks: Task[]
   team: TeamMember[]
   loading: boolean
+  error: string
+  reload: () => Promise<void>
   saveTask: (task: TaskInput, id?: string, quiet?: boolean) => Promise<void>
   importTasks: (tasks: TaskInput[]) => Promise<void>
   deleteTask: (id: string) => Promise<void>
@@ -28,8 +30,11 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
   const [tasks, setTasks] = useState<Task[]>([])
   const [team, setTeam] = useState<TeamMember[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   const load = useCallback(async () => {
+    setLoading(true)
+    setError('')
     try {
       const [taskResponse, teamResponse] = await Promise.all([
         fetch('/api/tasks', { credentials: 'same-origin', cache: 'no-store' }),
@@ -41,7 +46,7 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
       setTasks(taskResult.tasks)
       setTeam(teamResult.users)
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Falha ao carregar tarefas.')
+      setError(error instanceof Error ? error.message : 'Falha ao carregar tarefas.')
     } finally {
       setLoading(false)
     }
@@ -82,7 +87,7 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   return (
-    <TasksContext.Provider value={{ open, setOpen, currentRow, setCurrentRow, tasks, team, loading, saveTask, importTasks, deleteTask }}>
+    <TasksContext.Provider value={{ open, setOpen, currentRow, setCurrentRow, tasks, team, loading, error, reload: load, saveTask, importTasks, deleteTask }}>
       {children}
     </TasksContext.Provider>
   )
