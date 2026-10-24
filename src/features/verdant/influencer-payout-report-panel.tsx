@@ -1,3 +1,5 @@
+import { sortRows, type SortDirection } from './data'
+import { ColumnFilterControl, SortableTableHeader } from './list-controls'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -15,7 +17,12 @@ export function InfluencerPayoutReportPanel({ eventId, from: sharedFrom, to: sha
   const [rows, setRows] = useState<PayoutRow[]>()
   const [busy, setBusy] = useState(false),
     [error, setError] = useState('')
-  const [pdf, setPdf] = useState<{ bytes: Uint8Array; filename: string }>()
+  const [reportFinance, setReportFinance] = useState<FinanceData>()
+  const [query, setQuery] = useState('')
+  const [sortKey, setSortKey] = useState<keyof PayoutRow>('date')
+  const [direction, setDirection] = useState<SortDirection>('asc')
+  const displayRows = sortRows((rows || []).filter(row => !query || `${row.event} ${row.date} ${row.influencer}`.toLocaleLowerCase('pt-BR').includes(query.toLocaleLowerCase('pt-BR'))), row => row[sortKey], direction)
+  function toggle(key: typeof sortKey) { setDirection(sortKey === key && direction === 'asc' ? 'desc' : 'asc'); setSortKey(key) }
   const [reportKey, setReportKey] = useState('')
   const key = JSON.stringify([eventId, from, to])
   const current = reportKey === key && rows !== undefined
@@ -31,7 +38,7 @@ export function InfluencerPayoutReportPanel({ eventId, from: sharedFrom, to: sha
     setBusy(true)
     setError('')
     setRows(undefined)
-    setPdf(undefined)
+    setReportFinance(undefined)
     try {
       async function get<T>(url: string): Promise<T> {
         const response = await fetch(url, {
@@ -54,10 +61,23 @@ export function InfluencerPayoutReportPanel({ eventId, from: sharedFrom, to: sha
         from,
         to,
       })
+      setRows(next)
+      setReportKey(key)
+      setReportFinance(finance)
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+  async function downloadPdf() {
+    if (!reportFinance) return
+    setBusy(true); setError('')
+    try {
       const { createPortariaPdf } = await import('./portaria-pdf')
       const bytes = await createPortariaPdf({
         eventName: eventId
-          ? finance.events.find((e) => e.id === eventId)?.name ||
+          ? reportFinance!.events.find((e) => e.id === eventId)?.name ||
             'Evento selecionado'
           : 'Todos os eventos',
         eventDate:
@@ -68,7 +88,7 @@ export function InfluencerPayoutReportPanel({ eventId, from: sharedFrom, to: sha
         sections: [
           {
             title: 'R$ 3 por entrada validada — não realiza pagamentos',
-            groups: next.map((row) => ({
+            groups: displayRows.map((row) => ({
               label: `${row.influencer} | ${row.date} | ${row.event}`,
               names: [
                 `Inscrições: ${row.registered} | Entradas validadas: ${row.validated}`,
@@ -79,17 +99,8 @@ export function InfluencerPayoutReportPanel({ eventId, from: sharedFrom, to: sha
           },
         ],
       })
-      setRows(next)
-      setReportKey(key)
-      setPdf({
-        bytes: new Uint8Array(bytes),
-        filename: 'verdant-repasse-influencers.pdf',
-      })
-    } catch (e) {
-      setError((e as Error).message)
-    } finally {
-      setBusy(false)
-    }
+      download(new Uint8Array(bytes), 'application/pdf', 'verdant-repasse-influencers.pdf')
+    } catch (e) { setError((e as Error).message) } finally { setBusy(false) }
   }
   return (
     <Card className='finance-panel space-y-3 p-4'>
@@ -130,14 +141,14 @@ export function InfluencerPayoutReportPanel({ eventId, from: sharedFrom, to: sha
       {current && (
         <>
           <p>
-            {rows!.length} combinações de evento e influencer. A pagar:{' '}
+            {displayRows.length} combinações de evento e influencer. A pagar:{' '}
             {formatCents(
-              rows!.reduce((sum, row) => sum + row.pending + row.toGenerate, 0)
+              displayRows.reduce((sum, row) => sum + row.pending + row.toGenerate, 0)
             )}
-            . Pago: {formatCents(rows!.reduce((sum, row) => sum + row.paid, 0))}
+            . Pago: {formatCents(displayRows.reduce((sum, row) => sum + row.paid, 0))}
             .
           </p>
-          {!rows!.length && (
+          {!displayRows.length && (
             <p>
               Nenhuma inscrição ou entrada validada para os filtros
               selecionados.
@@ -146,15 +157,8 @@ export function InfluencerPayoutReportPanel({ eventId, from: sharedFrom, to: sha
           <div className='flex flex-wrap gap-2'>
             <Button
               variant='outline'
-              disabled={!pdf}
-              onClick={() =>
-                pdf &&
-                download(
-                  new Uint8Array(pdf.bytes),
-                  'application/pdf',
-                  pdf.filename
-                )
-              }
+              disabled={!reportFinance || busy}
+              onClick={() => void downloadPdf()}
             >
               Baixar PDF para imprimir
             </Button>
@@ -175,7 +179,7 @@ export function InfluencerPayoutReportPanel({ eventId, from: sharedFrom, to: sha
                       'Pago (R$)',
                       'Cancelado (R$)',
                     ],
-                    rows!.map((row) => [
+                    displayRows.map((row) => [
                       row.date,
                       row.event,
                       row.influencer,
@@ -200,22 +204,23 @@ export function InfluencerPayoutReportPanel({ eventId, from: sharedFrom, to: sha
               Exportar CSV
             </Button>
           </div>
+          <div className='verdant-column-filter-bar'><ColumnFilterControl label='Evento / influencer' value={query} onChange={setQuery} /></div>
           <div className='overflow-x-auto'>
             <table>
               <thead>
                 <tr>
-                  <th>Data / evento</th>
-                  <th>Influencer</th>
-                  <th>Inscrições</th>
-                  <th>Entradas</th>
-                  <th>A gerar</th>
-                  <th>Pendente</th>
-                  <th>Pago</th>
-                  <th>Cancelado</th>
+                  <SortableTableHeader label='Data / evento' active={sortKey === 'date'} direction={direction} onClick={() => toggle('date')} />
+                  <SortableTableHeader label='Influencer' active={sortKey === 'influencer'} direction={direction} onClick={() => toggle('influencer')} />
+                  <SortableTableHeader label='Inscrições' active={sortKey === 'registered'} direction={direction} onClick={() => toggle('registered')} />
+                  <SortableTableHeader label='Entradas' active={sortKey === 'validated'} direction={direction} onClick={() => toggle('validated')} />
+                  <SortableTableHeader label='A gerar' active={sortKey === 'toGenerate'} direction={direction} onClick={() => toggle('toGenerate')} />
+                  <SortableTableHeader label='Pendente' active={sortKey === 'pending'} direction={direction} onClick={() => toggle('pending')} />
+                  <SortableTableHeader label='Pago' active={sortKey === 'paid'} direction={direction} onClick={() => toggle('paid')} />
+                  <SortableTableHeader label='Cancelado' active={sortKey === 'cancelled'} direction={direction} onClick={() => toggle('cancelled')} />
                 </tr>
               </thead>
               <tbody>
-                {rows!.map((row) => (
+                {displayRows.map((row) => (
                   <tr key={JSON.stringify([row.eventId, row.influencerId])}>
                     <td>
                       {row.date} · {row.event}

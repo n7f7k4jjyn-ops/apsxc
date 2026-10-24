@@ -1,3 +1,5 @@
+import { SortableTableHeader, ColumnFilterControl } from './list-controls'
+import { sortRows, type SortDirection } from './data'
 import { useEffect, useMemo, useState } from 'react'
 import { formatCents } from './finance-data'
 
@@ -20,6 +22,10 @@ const dateLabel = (value: string) => value.split('-').reverse().join('/')
 export function ZigEventSummary({ from, to, eventId = '', eventIds }: { from: string; to: string; eventId?: string; eventIds?: string[] }) {
   const [reports, setReports] = useState<EventReport[] | null>(null)
   const [error, setError] = useState('')
+  const [query, setQuery] = useState('')
+  const [sortKey, setSortKey] = useState<keyof EventReport | 'entrance'>('date')
+  const [direction, setDirection] = useState<SortDirection>('asc')
+  function toggle(key: typeof sortKey) { setDirection(sortKey === key && direction === 'asc' ? 'desc' : 'asc'); setSortKey(key) }
 
   useEffect(() => {
     let active = true
@@ -51,6 +57,8 @@ export function ZigEventSummary({ from, to, eventId = '', eventIds }: { from: st
     }
   }, [visible])
 
+  const tableRows = sortRows(visible.filter(row => !query || `${row.name} ${row.date}`.toLocaleLowerCase('pt-BR').includes(query.toLocaleLowerCase('pt-BR'))), row => sortKey === 'entrance' ? row.couvertCents + row.entranceCents : typeof row[sortKey] === 'number' || typeof row[sortKey] === 'string' ? row[sortKey] as number | string : null, direction)
+
   if (error) return <p role='alert'>{error}</p>
   if (!reports) return <p role='status'>Carregando resumo…</p>
 
@@ -80,15 +88,16 @@ export function ZigEventSummary({ from, to, eventId = '', eventIds }: { from: st
             ))}
           </div>
           {totals.withoutLists > 0 && <p>{totals.withoutLists} evento(s) sem evento no app: ficam fora de inscritos e conversão.</p>}
+          <div className='verdant-column-filter-bar'><ColumnFilterControl label='Evento / data' value={query} onChange={setQuery} /></div>
           <div className='finance-table'>
             <table>
               <thead>
                 <tr>
-                  <th>Evento</th><th>Data</th><th>Na casa</th><th>Inscritos</th><th>Pela lista</th><th>Conversão</th><th>Sem lista</th><th>Bar</th><th>Couvert/ingressos</th><th>Total</th><th>Ticket médio</th>
+                  <SortableTableHeader label='Evento' active={sortKey === 'name'} direction={direction} onClick={() => toggle('name')} /><SortableTableHeader label='Data' active={sortKey === 'date'} direction={direction} onClick={() => toggle('date')} /><SortableTableHeader label='Na casa' active={sortKey === 'presentInHouse'} direction={direction} onClick={() => toggle('presentInHouse')} /><SortableTableHeader label='Inscritos' active={sortKey === 'registered'} direction={direction} onClick={() => toggle('registered')} /><SortableTableHeader label='Pela lista' active={sortKey === 'cameFromLists'} direction={direction} onClick={() => toggle('cameFromLists')} /><SortableTableHeader label='Conversão' active={sortKey === 'conversionPercent'} direction={direction} onClick={() => toggle('conversionPercent')} /><SortableTableHeader label='Sem lista' active={sortKey === 'walkInsWithoutList'} direction={direction} onClick={() => toggle('walkInsWithoutList')} /><SortableTableHeader label='Bar' active={sortKey === 'barCents'} direction={direction} onClick={() => toggle('barCents')} /><SortableTableHeader label='Couvert/ingressos' active={sortKey === 'entrance'} direction={direction} onClick={() => toggle('entrance')} /><SortableTableHeader label='Total' active={sortKey === 'totalCents'} direction={direction} onClick={() => toggle('totalCents')} /><SortableTableHeader label='Ticket médio' active={sortKey === 'avgTicketCents'} direction={direction} onClick={() => toggle('avgTicketCents')} />
                 </tr>
               </thead>
               <tbody>
-                {visible.map((item) => (
+                {tableRows.map((item) => (
                   <tr key={item.key}>
                     <td>
                       {item.name}
