@@ -6,6 +6,7 @@ export type DjLineRow = {
   name: string
   track: string
   time: string
+  secondTime?: string
   order: number
 }
 export function djLineRows(
@@ -30,6 +31,7 @@ export function djLineRows(
       name: p.name,
       track: p.eventDetails[eventId]?.track || '',
       time: p.eventDetails[eventId]?.time || '',
+      secondTime: p.eventDetails[eventId]?.secondTime || '',
       order: p.eventDetails[eventId]?.order || 0,
     }))
     .sort(
@@ -55,7 +57,7 @@ export function djLineSections(rows: DjLineRow[]): PortariaSection[] {
         label: 'Ordem | DJ | Horário',
         names: items.map(
           (row) =>
-            `${row.order || 'Sem ordem'}. ${row.name} | ${row.time || 'Horário não informado'}`
+            `${row.order || 'Sem ordem'}. ${row.name} | ${row.time || 'Horário não informado'}${row.secondTime ? ` / 2º: ${row.secondTime}` : ''}`
         ),
       },
     ],
@@ -87,5 +89,59 @@ export function validateDjOrder(rows: DjLineRow[]) {
         `Ordem ${row.order} repetida na pista ${row.track || 'não informada'}.`
       )
     used.add(key)
+  }
+}
+
+// Replacement changes only the current event schedule. Historical registrations and finance retain their beneficiary IDs.
+export function applyDjLine(
+  state: VerdantState,
+  eventId: string,
+  rows: (DjLineRow & { originalId: string })[]
+): VerdantState {
+  validateDjOrder(rows)
+  if (new Set(rows.map((row) => row.id)).size !== rows.length)
+    throw new Error(
+      'O mesmo DJ não pode ocupar duas posições. Use o segundo horário.'
+    )
+  for (const row of rows) {
+    if (
+      !state.people.some(
+        (person) => person.id === row.id && person.kind === 'DJ'
+      )
+    )
+      throw new Error('DJ não encontrado.')
+    if (!['SKY', 'LAND'].includes(row.track))
+      throw new Error('Escolha SKY ou LAND para cada DJ.')
+    if (row.secondTime && !/^([01]\d|2[0-3]):[0-5]\d$/.test(row.secondTime))
+      throw new Error('Informe um segundo horário válido.')
+  }
+  const originals = new Set(rows.map((row) => row.originalId))
+  return {
+    ...state,
+    people: state.people.map((person) => {
+      const row = rows.find((item) => item.id === person.id)
+      if (row)
+        return {
+          ...person,
+          eventIds: [...new Set([...person.eventIds, eventId])],
+          eventDetails: {
+            ...person.eventDetails,
+            [eventId]: {
+              track: row.track,
+              time: row.time,
+              secondTime: row.secondTime || '',
+              order: row.order,
+            },
+          },
+        }
+      if (!originals.has(person.id)) return person
+      const details = { ...person.eventDetails }
+      delete details[eventId]
+      return {
+        ...person,
+        eventIds: person.eventIds.filter((id) => id !== eventId),
+        eventDetails: details,
+      }
+    }),
   }
 }

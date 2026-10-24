@@ -188,3 +188,12 @@
   font-size: 12px;
   font-weight: 500;
 }
+
+.roster-calendar {border:1px solid var(--border);border-radius:12px;padding:16px;margin-block:16px}
+.roster-calendar-grid {display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.roster-calendar-grid > b {font-size:12px;text-align:center;padding:8px 0}
+.roster-calendar-grid > button {min-height:90px;border:1px solid var(--border);border-radius:6px;text-align:left;padding:8px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.roster-calendar-grid > button:hover,.roster-calendar-grid > button[aria-pressed=true] {background:var(--accent);outline:2px solid var(--primary)}
+.roster-calendar-grid .outside {opacity:.5}
+.roster-calendar-grid small {font-size:11px;overflow-wrap:anywhere;background:var(--muted);border-radius:4px;padding:3px}
+@media(max-width:640px){.roster-calendar{padding:8px}.roster-calendar-grid > button{min-height:65px;padding:3px}.roster-calendar-grid small{font-size:9px;padding:1px}}

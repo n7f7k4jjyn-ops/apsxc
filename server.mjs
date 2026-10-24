@@ -1,6 +1,6 @@
 import { testStaffChanges } from './lib/test-staff.mjs'
 import { validateRoster, teamStatus } from './lib/rosters.mjs'
-import { applicationStatuses, registryIdentity, registryPhone, groupRegistryClients, latestTeam, promotedTeam } from './lib/registry.mjs'
+import { registryClientPage, applicationStatuses, registryIdentity, latestTeam, promotedTeam } from './lib/registry.mjs'
 import { createServer } from 'node:http'
 import { createCipheriv, createDecipheriv, createHash, randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto'
 import { isIP } from 'node:net'
@@ -2423,31 +2423,12 @@ const server = createServer(async (request, response) => {
       const eventId = String(url.searchParams.get('event') || '')
       const offset = Math.max(0, Number(url.searchParams.get('offset')) || 0)
       const state = await readState()
-      const people = groupRegistryClients(state.registrations)
-      const related = []
-      if (mysqlPool) {
-        const keys = [...new Set(people.flatMap(person => { const phone = registryPhone(person.phone); return phone ? [phone, `55${phone}`] : [] }))]
-        for (let start = 0; start < keys.length; start += 300) {
-          const batch = keys.slice(start,start+300)
-          const [rows] = await mysqlPool.execute(`SELECT payload FROM verdant_customers WHERE phone_key IN (${batch.map(() => '?').join(',')})`, batch)
-          related.push(...rows.map(row => JSON.parse(row.payload)))
-        }
-        const emails = [...new Set(people.filter(person=>!registryPhone(person.phone)).map(person=>String(person.email || '').trim().toLowerCase()).filter(Boolean))]
-        for (let start = 0; start < emails.length; start += 300) {
-          const batch = emails.slice(start,start+300)
-          const [rows] = await mysqlPool.execute(`SELECT payload FROM verdant_customers WHERE email_key IN (${batch.map(() => '?').join(',')})`,batch)
-          related.push(...rows.map(row=>JSON.parse(row.payload)))
-        }
-
-      } else related.push(...await readJsonFile(customersPath, []))
-      const byIdentity = new Map(people.map(person => [registryIdentity(person), person]))
-      const matched = new Set(related.map(registryIdentity))
-      const matches = person => (!q || `${person.name} ${person.phone} ${person.email}`.toLowerCase().includes(q)) && (!eventId || person.history.some(row => row.eventId === eventId))
-      const orphan = people.filter(person => (eventId || !matched.has(registryIdentity(person))) && matches(person)).sort((a,b) => a.name.localeCompare(b.name,'pt-BR'))
-      const base = eventId ? { total: 0, customers: [] } : await queryCustomers(q, Math.max(0,offset-orphan.length), Math.max(0,50-Math.max(0,orphan.length-offset)))
-      const clients = [...orphan.slice(offset,offset+50), ...base.customers.map(customer => ({ ...customer, history: byIdentity.get(registryIdentity(customer))?.history || [] }))]
+      const customers = mysqlPool
+        ? (await mysqlPool.execute('SELECT payload FROM verdant_customers'))[0].map(row => JSON.parse(row.payload))
+        : await readJsonFile(customersPath, [])
+      const page = registryClientPage(state.registrations, customers, {q, event:eventId, offset, sort:url.searchParams.get('sort'), dir:url.searchParams.get('dir')})
       response.setHeader('Cache-Control', 'no-store')
-      return sendJson(response,200,{ clients, total: orphan.length + base.total })
+      return sendJson(response,200,page)
     }
     const rosterMatch = url.pathname.match(/^\/api\/rosters(?:\/([a-zA-Z0-9-]+))?$/)
     if (rosterMatch && ['GET','POST','PUT'].includes(request.method)) {
