@@ -16,7 +16,9 @@ import { migrateVerdantState } from './lib/verdant-state-migration.mjs'
 import { PUBLIC_FORM_META, personalizeFormShareHtml } from './lib/public-form-meta.mjs'
 import { emptyFinance, validateFinanceStore, changeFinance } from './lib/finance.mjs'
 import { ZIG_BASE_URL, ZigError, createZigClient, validateToken as validZigToken } from './lib/zig-client.mjs'
-import { buildZigPreview, listZigEvents, validatePreviewPeriod } from './lib/zig-preview.mjs'
+import { buildZigPreview, collectZigData, formatZigPreview, listZigEvents, matchZigData, validatePreviewPeriod } from './lib/zig-preview.mjs'
+import { planEventMerge } from './lib/event-merge.mjs'
+import { ZigApplyError, mergePending, planZigWrites, publicPending, pushRun, resolvePending } from './lib/zig-apply.mjs'
 
 const root = path.dirname(fileURLToPath(import.meta.url))
 const dist = path.join(root, 'dist')
@@ -36,6 +38,8 @@ const teamRegistrationsPath = process.env.VERDANT_TEAM_REGISTRATIONS_FILE || pat
 let teamRegistrationQueue = Promise.resolve()
 const operationsPath = process.env.VERDANT_OPERATIONS_FILE || path.join(root,'storage','operations.json')
 const financePath = process.env.VERDANT_FINANCE_FILE || path.join(root, 'storage', 'finance.json')
+const zigPendingPath = process.env.VERDANT_ZIG_PENDING_FILE || path.join(root, 'storage', 'zig-pending.json')
+const backupDirectory = process.env.VERDANT_BACKUP_DIR || path.join(root, 'storage', 'backups')
 let financeQueue = Promise.resolve()
 let operationsQueue = Promise.resolve()
 const port = Number(process.env.PORT || 3000)
@@ -129,6 +133,7 @@ function jsonStoreKey(filePath) {
   if (resolved === path.resolve(teamUsersPath)) return 'team_users'
   if (resolved === path.resolve(chatsPath)) return 'team_chats'
   if (resolved === path.resolve(integrationsPath)) return 'integrations'
+  if (resolved === path.resolve(zigPendingPath)) return 'zig_pending'
   if (resolved === path.resolve(customersPath)) return 'customers_legacy'
   return ''
 }
@@ -594,6 +599,12 @@ async function saveCustomerRecord(connection, customer) {
     persisted.id = existingRows[0].id
   }
   const id = String(persisted.id || `customer-${randomBytes(12).toString('hex')}`).slice(0, 80)
+  persisted.id = id
+  await upsertCustomerRow(connection, persisted, sourceSystem, sourceId)
+}
+
+async function upsertCustomerRow(connection, persisted, sourceSystem, sourceId) {
+  const id = String(persisted.id).slice(0, 80)
   await connection.execute(
     `INSERT INTO verdant_customers (id, cpf_key, email_key, phone_key, name, phone, email, source_event_id, payload)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -1142,6 +1153,119 @@ function decryptIntegrationSecret(payload) {
 
 const ZIG_TEST_BASE_URL = process.env.NODE_ENV === 'test' ? String(process.env.VERDANT_ZIG_TEST_BASE_URL || '') : ''
 let zigPreviewRunning = false
+let zigLastBackup = { at: 0, file: '' }
+const ZIG_BACKUP_REUSE_MS = 30 * 60 * 1000
+
+function queueCustomerWork(operation) {
+  const run = customerMutationQueue.then(operation)
+  customerMutationQueue = run.catch(() => {})
+  return run
+}
+
+async function readZigPending() {
+  const store = await readJsonFile(zigPendingPath, {})
+  return { items: Array.isArray(store?.items) ? store.items : [], runs: Array.isArray(store?.runs) ? store.runs : [] }
+}
+
+// Backup completo de clientes e pendências antes de qualquer gravação; reaproveita um backup recente da mesma sessão de trabalho.
+async function backupBeforeZigWrite(customers) {
+  if (zigLastBackup.file && Date.now() - zigLastBackup.at < ZIG_BACKUP_REUSE_MS) return zigLastBackup.file
+  const file = `zig-${new Date().toISOString().replace(/[:.]/g, '-')}.json`
+  await mkdir(backupDirectory, { recursive: true })
+  await writeFile(path.join(backupDirectory, file), JSON.stringify({ createdAt: new Date().toISOString(), customers, zigPending: await readZigPending() }), { encoding: 'utf8', mode: 0o600 })
+  zigLastBackup = { at: Date.now(), file }
+  return file
+}
+
+function makeZigCustomer(create, lojaId, now) {
+  const incoming = normalizeImportedCustomer(create.input, 'zig')
+  return {
+    ...incoming,
+    id: `customer-${randomBytes(12).toString('hex')}`,
+    sourceRefs: [{ system: 'zig', id: incoming.sourceId }],
+    zigRefs: create.zigId ? [{ system: 'zig', id: String(create.zigId), lojaId: lojaId || null, linkedAt: now }] : [],
+    zigFilledFields: [],
+    updatedAt: now,
+  }
+}
+
+async function persistZigCustomers(updated, created) {
+  if (!updated.length && !created.length) return
+  if (mysqlPool) {
+    const connection = await mysqlPool.getConnection()
+    try {
+      await connection.beginTransaction()
+      for (const customer of [...updated, ...created]) {
+        await upsertCustomerRow(connection, customer, String(customer.sourceSystem || 'legacy-json').slice(0, 80), String(customer.sourceId || customer.id || '').slice(0, 128))
+      }
+      await connection.commit()
+    } catch (error) {
+      await connection.rollback()
+      throw error
+    } finally { connection.release() }
+    return
+  }
+  const current = await readJsonFile(customersPath, [])
+  const byId = new Map(updated.map((customer) => [String(customer.id), customer]))
+  const next = (Array.isArray(current) ? current : []).map((customer) => byId.get(String(customer.id)) ?? customer)
+  await writeJsonFile(customersPath, [...next, ...created])
+}
+
+// Recalcula o plano com os dados atuais, confere com o que foi confirmado e só então grava (união segura, sem sobrescrever).
+function applyZigData(data, expected, period) {
+  return queueCustomerWork(async () => {
+    const stored = await readJsonFile(customersPath, [])
+    const customers = Array.isArray(stored) ? stored : []
+    const state = await readState()
+    const groups = matchZigData(data, customers, Array.isArray(state?.registrations) ? state.registrations : [])
+    const now = new Date().toISOString()
+    const plan = planZigWrites(groups, customers, { lojaId: data.lojaId, now })
+    if (expected.updates !== plan.summary.updates || expected.creates !== plan.summary.creates) {
+      throw new ZigApplyError(`Os dados mudaram desde a prévia (agora: ${plan.summary.updates} atualizações e ${plan.summary.creates} clientes novos). Gere a prévia novamente e confirme.`, 409)
+    }
+    const created = []
+    const skipped = [...plan.skipped]
+    for (const create of plan.creates) {
+      try { created.push(makeZigCustomer(create, data.lojaId, now)) } catch { skipped.push({ name: create.input.name, zigId: create.zigId, reason: 'invalid_customer' }) }
+    }
+    const backup = await backupBeforeZigWrite(customers)
+    await persistZigCustomers(plan.touchedCustomers, created)
+    const pendingStore = await readZigPending()
+    const merged = mergePending(pendingStore.items, plan.pending.map((item) => ({ ...item, lojaId: data.lojaId })), now)
+    const report = {
+      at: now, period, backup,
+      updated: plan.summary.updates, created: created.length, kept: plan.summary.kept, registrationOnly: plan.summary.registrationOnly,
+      skipped: skipped.length, fills: plan.summary.fills,
+      pendingAdded: merged.added, pendingRefreshed: merged.refreshed, pendingAlreadyDecided: merged.decided,
+    }
+    await writeJsonFile(zigPendingPath, { items: merged.items, runs: pushRun(pendingStore.runs, report) })
+    return { ...report, skippedDetails: skipped.slice(0, 20) }
+  })
+}
+
+function resolveZigPending(key, action, customerId) {
+  return queueCustomerWork(async () => {
+    const store = await readZigPending()
+    const item = store.items.find((entry) => entry.key === key)
+    if (!item) throw new ZigApplyError('Pendência não encontrada.', 404)
+    const stored = await readJsonFile(customersPath, [])
+    const customers = Array.isArray(stored) ? stored : []
+    const now = new Date().toISOString()
+    const lojaId = String(item.lojaId || '')
+    const result = resolvePending(item, action, { customers, lojaId, now, customerId })
+    const created = []
+    if (result.create) {
+      try { created.push(makeZigCustomer(result.create, lojaId, now)) } catch { throw new ZigApplyError('Não foi possível criar o cliente com estes dados.') }
+    }
+    if (result.customer || created.length) {
+      await backupBeforeZigWrite(customers)
+      await persistZigCustomers(result.customer ? [result.customer] : [], created)
+    }
+    const items = store.items.map((entry) => entry.key === key ? { ...entry, status: result.status, decision: { action, customerId: result.customerId || null, at: now }, resolvedAt: now } : entry)
+    await writeJsonFile(zigPendingPath, { items, runs: store.runs })
+    return { status: result.status }
+  })
+}
 
 function zigSettingsForAdmin(value) {
   const zig = value?.zig || {}
@@ -1170,6 +1294,7 @@ async function zigContext({ needStore = false } = {}) {
 }
 
 function sendZigError(response, error) {
+  if (error instanceof ZigApplyError) return sendJson(response, error.status, { error: error.message, code: 'zig_apply' })
   if (error instanceof ZigError) {
     const status = Number.isInteger(error.status) ? error.status : 502
     return sendJson(response, status, { error: error.message, code: error.code || 'zig_error' })
@@ -1945,8 +2070,35 @@ const server = createServer(async (request, response) => {
       response.setHeader('Cache-Control', 'no-store')
       return sendJson(response, 200, { settings: integrationSettingsForAdmin(settings) })
     }
+    if (url.pathname === '/api/admin/events/merge' && request.method === 'POST') {
+      const mergeUser = await requireCapability(request, response, 'zig:manage')
+      if (!mergeUser) return
+      if (!isMasterAdminAccount(mergeUser)) return sendJson(response, 403, { error: 'A mesclagem de eventos é restrita ao administrador master.' })
+      const value = await bodyJson(request)
+      const keepId = String(value?.keepId || '')
+      const dropId = String(value?.dropId || '')
+      const result = await queueStateMutation(async () => {
+        const state = await readState()
+        let plan
+        try { plan = planEventMerge(state, keepId, dropId) } catch (error) { throw requestError(error.message) }
+        if (value?.confirm !== true) return { dryRun: true, report: plan.report }
+        if (!Number.isSafeInteger(value.revision) || value.revision !== state.revision) throw requestError('Os dados mudaram após a simulação. Refaça a simulação.', 409)
+        const file = `events-merge-${new Date().toISOString().replace(/[:.]/g, '-')}.json`
+        await mkdir(backupDirectory, { recursive: true })
+        await writeFile(path.join(backupDirectory, file), JSON.stringify({ createdAt: new Date().toISOString(), state }), { encoding: 'utf8', mode: 0o600 })
+        const saved = { ...plan.state, revision: state.revision + 1, updatedAt: new Date().toISOString() }
+        if (!await saveStateIfRevision(saved, state.revision)) {
+          currentState = undefined
+          throw requestError('Os dados mudaram durante a mesclagem. Nada foi gravado; tente novamente.', 409)
+        }
+        return { dryRun: false, report: plan.report, backup: file, revision: saved.revision }
+      })
+      return sendJson(response, 200, { ...result, revision: result.revision ?? (await readState()).revision })
+    }
     if (url.pathname.startsWith('/api/admin/zig/')) {
-      if (!(await requireCapability(request, response, 'zig:manage'))) return
+      const zigUser = await requireCapability(request, response, 'zig:manage')
+      if (!zigUser) return
+      if (!isMasterAdminAccount(zigUser)) return sendJson(response, 403, { error: 'A integração Zig é restrita ao administrador master.' })
       response.setHeader('Cache-Control', 'no-store')
       const route = url.pathname.slice('/api/admin/zig/'.length)
       try {
@@ -2033,6 +2185,35 @@ const server = createServer(async (request, response) => {
           } finally {
             zigPreviewRunning = false
           }
+        }
+        if (route === 'apply' && request.method === 'POST') {
+          const value = await bodyJson(request)
+          const dtinicio = String(value?.dtinicio || '')
+          const dtfim = String(value?.dtfim || '')
+          const invalid = validatePreviewPeriod(dtinicio, dtfim)
+          if (invalid) return sendJson(response, 400, { error: invalid })
+          const expected = value?.expected
+          if (value?.confirm !== true || !Number.isInteger(expected?.updates) || !Number.isInteger(expected?.creates)) {
+            return sendJson(response, 400, { error: 'Confirme a gravação com os totais da prévia (confirm, expected.updates, expected.creates).' })
+          }
+          const { client, lojaId } = await zigContext({ needStore: true })
+          if (zigPreviewRunning) return sendJson(response, 409, { error: 'Já existe uma consulta da Zig em andamento. Aguarde a conclusão.' })
+          zigPreviewRunning = true
+          try {
+            const data = await collectZigData({ client, lojaId, dtinicio, dtfim })
+            return sendJson(response, 200, { report: await applyZigData(data, expected, { dtinicio, dtfim }) })
+          } finally {
+            zigPreviewRunning = false
+          }
+        }
+        if (route === 'pending' && request.method === 'GET') {
+          const store = await readZigPending()
+          return sendJson(response, 200, { items: store.items.map(publicPending), runs: store.runs.slice(-10) })
+        }
+        if (route === 'pending/resolve' && request.method === 'POST') {
+          const value = await bodyJson(request)
+          if (typeof value?.key !== 'string' || !['link', 'create', 'ignore'].includes(value?.action)) return sendJson(response, 400, { error: 'Informe a pendência e a ação (link, create ou ignore).' })
+          return sendJson(response, 200, await resolveZigPending(value.key, value.action, String(value.customerId || '')))
         }
       } catch (error) {
         return sendZigError(response, error)

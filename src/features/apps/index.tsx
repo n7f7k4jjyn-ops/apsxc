@@ -22,6 +22,7 @@ import { LocalizedText, useLanguage } from '@/context/language-provider'
 import { useAuthStore } from '@/stores/auth-store'
 import { apps } from './data/apps'
 import { ZigIntegration } from './zig-integration'
+import { EventMerge } from './event-merge'
 
 const route = getRouteApi('/_authenticated/apps/')
 
@@ -54,6 +55,10 @@ const shortcutAppNames = new Set(['WhatsApp', 'Gmail', 'Telegram'])
 export function Apps() {
   const { translate } = useLanguage()
   const isAdmin = useAuthStore((state) => state.auth.user?.role.includes('admin') ?? false)
+  const isZigMaster = useAuthStore((state) => {
+    const user = state.auth.user
+    return user?.username?.trim().toLowerCase() === 'eibrnof' || user?.email?.trim().toLowerCase() === 'brn@scopedeal.com.br'
+  })
   const {
     filter = '',
     type = 'all',
@@ -185,13 +190,13 @@ export function Apps() {
       </Header>
 
       {/* ===== Content ===== */}
-      <Main fixed>
+      <Main className='flex flex-col'>
         <div>
           <h1 className='text-2xl font-bold tracking-tight'>{<LocalizedText text="Integrações de apps" leadingSpace trailingSpace />}</h1>
           <p className='text-muted-foreground'>{<LocalizedText text="Catálogo de serviços. A conexão OAuth/API ainda precisa ser configurada para cada serviço." leadingSpace trailingSpace />}</p>
         </div>
         <div role='status' className='rounded-lg border border-amber-300/60 bg-amber-50/70 px-4 py-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100'>{<LocalizedText text="Esses serviços estão em implantação: as configurações podem ser salvas por administradores. Somente o Meta Pixel está ativo nesta versão; os demais atalhos ainda não." />}</div>
-        {isAdmin && <details id='integracoes' open className='rounded-lg border p-4'>
+        {isAdmin && <details id='integracoes' className='rounded-lg border p-4'>
           <summary className='cursor-pointer font-semibold'>{<LocalizedText text='Configurações administrativas de integrações' />}</summary>
           {settingsLoading ? <p className='pt-4 text-sm text-muted-foreground'>{<LocalizedText text='Carregando configurações…' />}</p> : !settingsLoaded ? <p role='alert' className='pt-4 text-sm text-destructive'>{settingsError || translate('Não foi possível carregar as configurações.')}</p> : <form onSubmit={saveIntegrationSettings} className='mt-4 space-y-4'>
             <p className='text-sm text-muted-foreground'>{<LocalizedText text='As configurações ficam no servidor. Segredos nunca são devolvidos à interface; campos vazios preservam credenciais salvas. O Meta Pixel é o único item ativo: ao salvar o ID, os formulários públicos passam a registrar visualização e envio.' />}</p>
@@ -209,9 +214,13 @@ export function Apps() {
             <Button type='submit' disabled={settingsSaving}>{settingsSaving ? translate('Salvando…') : translate('Salvar configurações')}</Button>
           </form>}
         </details>}
-        {isAdmin && <details id='zig' className='rounded-lg border p-4'>
+        {isAdmin && isZigMaster && <details id='zig' className='rounded-lg border p-4'>
           <summary className='cursor-pointer font-semibold'>Zig: conexão e prévia de clientes (somente consulta)</summary>
           <div className='mt-4'><ZigIntegration /></div>
+        </details>}
+        {isAdmin && isZigMaster && <details id='mesclar-eventos' className='rounded-lg border p-4'>
+          <summary className='cursor-pointer font-semibold'>Mesclar eventos duplicados</summary>
+          <div className='mt-4'><EventMerge /></div>
         </details>}
         {!isAdmin && <p role='status' className='text-xs text-muted-foreground'><LocalizedText text='A configuração de integrações está disponível somente para administradores.' /></p>}
         <div className='my-4 flex items-end justify-between sm:my-0 sm:items-center'>

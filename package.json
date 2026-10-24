@@ -9,7 +9,8 @@
     "start": "node server.mjs",
     "auth:hash": "node scripts/hash-password.mjs",
     "lint": "eslint .",
-    "test:server": "node tests/server.integration.test.mjs && node lib/public-form-meta.test.mjs && node lib/registry.test.mjs && node lib/rosters.test.mjs && node --test lib/finance.test.mjs tests/finance.integration.test.mjs lib/zig-client.test.mjs lib/zig-matching.test.mjs tests/zig.integration.test.mjs",
+    "test:e2e:zig": "node scripts/zig-e2e.mjs",
+    "test:server": "node tests/server.integration.test.mjs && node lib/public-form-meta.test.mjs && node lib/registry.test.mjs && node lib/rosters.test.mjs && node --test lib/finance.test.mjs tests/finance.integration.test.mjs lib/zig-client.test.mjs lib/zig-matching.test.mjs lib/zig-apply.test.mjs lib/event-merge.test.mjs tests/zig.integration.test.mjs",
     "preview": "vite preview",
     "format:check": "prettier --check .",
     "format": "prettier --write .",
@@ -81,9 +82,9 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
-    "@vitest/browser-playwright": "^4.1.4",
-    "@vitest/coverage-v8": "^4.1.4",
-    "@vitest/ui": "^4.1.4",
+    "@vitest/browser-playwright": "^4.1.12",
+    "@vitest/coverage-v8": "^4.1.12",
+    "@vitest/ui": "^4.1.12",
     "eslint": "^10.2.1",
     "eslint-plugin-react-hooks": "7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
@@ -95,7 +96,7 @@
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.58.2",
     "vite": "^8.0.8",
-    "vitest": "^4.1.4",
+    "vitest": "^4.1.12",
     "vitest-browser-react": "^2.2.0"
   }
 }

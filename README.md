@@ -64,9 +64,9 @@ Hospedagem apenas estática (por exemplo, publicar `dist/` em um CDN sem iniciar
 
 As áreas Google Analytics e Meta/Instagram informam que ainda não há conexão e não exibem métricas de demonstração. Para ativá-las, será necessário configurar credenciais e permissões aprovadas para as contas correspondentes.
 
-### Zig (etapa 1: conexão e prévia, somente leitura)
+### Zig (conexão, prévia, Gravar e Pendências)
 
-Na tela **Apps** (somente administradores; permissão `zig:manage`, validada no servidor em `/api/admin/zig/*`), é possível conectar à API da Zig e gerar uma prévia do cruzamento de clientes com as listas existentes. Esta etapa faz apenas consultas `GET`, não grava clientes importados, não cria lançamentos no Financeiro, não mexe em bônus/pagamentos e não tem sincronização agendada.
+Na tela **Apps** (somente a conta Admin Master `eibrnof`; validada no servidor em `/api/admin/zig/*`, outros usuários, inclusive administradores, recebem 403 e não veem a seção), é possível conectar à API da Zig e gerar uma prévia do cruzamento de clientes com as listas existentes. A Zig só recebe consultas `GET`; a prévia não grava nada (veja Gravar abaixo), não cria lançamentos no Financeiro, não mexe em bônus/pagamentos e não tem sincronização agendada.
 
 Configuração privada:
 
@@ -90,6 +90,17 @@ Associação check-in/compra ↔ evento (**provisória**, a confirmar com a Zig)
 Datas consultadas: eventos de 1 dia antes até 2 dias depois do período (contexto para separar noites consecutivas); check-ins de `dtinicio` até `dtfim`+2 (a Zig não documenta se `dtfim` é inclusivo; janelas se sobrepõem em 1 dia e duplicados são removidos); compradores até `dtfim`+1 para cobrir a madrugada, desde que o limite de 5 eventos por consulta seja respeitado — se houver evento no dia seguinte que estoure o limite, a consulta usa só `dtfim` e a prévia avisa que compras da madrugada podem faltar.
 
 Erros da Zig: as mensagens mostradas são sempre locais (por status HTTP); o corpo bruto da resposta nunca é lido nem repassado, pois pode ecoar o token, inclusive truncado.
+
+#### Gravar e Pendências (somente `eibrnof`)
+
+Após a prévia, o botão **Gravar** (`POST /api/admin/zig/apply`, exige `confirm:true` e o `expected` da prévia; se os números mudaram, responde 409 sem gravar) recalcula o plano no servidor e:
+
+- cria os clientes novos (`sourceSystem:'zig'`, `sourceId` = ID Zig);
+- vincula o ID Zig (`zigRefs`) a clientes existentes e preenche **somente campos vazios** (CPF, e-mail, nascimento); CPF já usado por outro cliente não é preenchido;
+- envia divergências (telefone compartilhado, homônimos, documento conflitante, múltiplas correspondências, duplicidade interna da Zig) para **Pendências**, sem gravar nelas;
+- não apaga nem sobrescreve nada, não toca o Financeiro e não faz chamadas Zig além de GET; presença não confirmada e comandas de mesa não são gravadas.
+
+Antes de gravar é feito um backup completo de clientes e pendências em `storage/backups` (`VERDANT_BACKUP_DIR`; a pasta precisa ser gravável; reutilizado por 30 minutos). Reaplicar é idempotente. Em **Pendências** (`GET /pending`, `POST /pending/resolve`) cada item pode ser vinculado a um cliente sugerido, criado como novo ou ignorado; a decisão é salva e não reaparece. Recomenda-se rodar a gravação real com um evento já encerrado.
 
 Nome sozinho nunca unifica cadastros; telefone compartilhado, homônimos, documentos conflitantes e múltiplas correspondências ficam para conferência. Próxima etapa: gravar vínculos (ID Zig) e dados complementares após aprovação da prévia.
 

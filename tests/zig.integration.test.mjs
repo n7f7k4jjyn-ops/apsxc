@@ -51,12 +51,13 @@ test('Zig: acesso admin, token protegido, teste de conexão e prévia sem grava�
     ...process.env, NODE_ENV: 'test', PORT: String(port), VERDANT_SEED_TEST_STAFF: 'false',
     VERDANT_INTEGRATION_ENCRYPTION_KEY: randomBytes(32).toString('base64'),
     VERDANT_ZIG_TEST_BASE_URL: `http://127.0.0.1:${zig.address().port}`,
-    VERDANT_USERS_JSON: JSON.stringify(['admin', 'operator', 'viewer'].map((role) => ({ username: role, role, passwordHash }))),
+    VERDANT_USERS_JSON: JSON.stringify(['eibrnof', 'admin', 'operator', 'viewer'].map((role) => ({ username: role, role: role === 'eibrnof' ? 'admin' : role, passwordHash }))),
   }
   for (const key of ['DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASSWORD', 'VERDANT_ADMIN_USERNAME']) delete env[key]
-  for (const key of ['DATA', 'SESSIONS', 'TASKS', 'CONTENT_PLAN', 'PREFERENCES', 'TEAM_USERS', 'CHATS', 'CUSTOMERS', 'INTEGRATIONS', 'JOB_APPLICATIONS', 'TEAM_REGISTRATIONS', 'OPERATIONS', 'FINANCE']) {
+  for (const key of ['DATA', 'SESSIONS', 'TASKS', 'CONTENT_PLAN', 'PREFERENCES', 'TEAM_USERS', 'CHATS', 'CUSTOMERS', 'INTEGRATIONS', 'JOB_APPLICATIONS', 'TEAM_REGISTRATIONS', 'OPERATIONS', 'FINANCE', 'ZIG_PENDING']) {
     env[`VERDANT_${key}_FILE`] = path.join(directory, `${key.toLowerCase()}.json`)
   }
+  env.VERDANT_BACKUP_DIR = path.join(directory, 'backups')
   let logs = ''
   const child = spawn(process.execPath, ['server.mjs'], { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] })
   child.stdout.on('data', (chunk) => { logs += chunk })
@@ -76,14 +77,17 @@ test('Zig: acesso admin, token protegido, teste de conexão e prévia sem grava�
       try { if ((await fetch(`${url}/api/health`)).status === 200) break } catch { /* aguarda */ }
       await delay(50)
     }
-    for (const cookie of ['', await login('operator'), await login('viewer')]) {
+    for (const cookie of ['', await login('admin'), await login('operator'), await login('viewer')]) {
       assert.equal((await call(cookie, 'GET', 'config')).status, cookie ? 403 : 401)
       assert.equal((await call(cookie, 'PUT', 'config', { token: TOKEN })).status, cookie ? 403 : 401)
       assert.equal((await call(cookie, 'POST', 'preview', { dtinicio: '2026-10-10', dtfim: '2026-10-10' })).status, cookie ? 403 : 401)
+      assert.equal((await call(cookie, 'POST', 'apply', { dtinicio: '2026-10-10', dtfim: '2026-10-10', confirm: true, expected: { updates: 0, creates: 0 } })).status, cookie ? 403 : 401)
+      assert.equal((await call(cookie, 'GET', 'pending')).status, cookie ? 403 : 401)
+      assert.equal((await call(cookie, 'POST', 'pending/resolve', { key: 'x', action: 'ignore' })).status, cookie ? 403 : 401)
     }
     assert.equal(requests.length, 0)
 
-    const admin = await login('admin')
+    const admin = await login('eibrnof')
     const initial = JSON.parse((await call(admin, 'GET', 'config')).text).settings
     assert.deepEqual(initial.missing, ['token', 'rede', 'loja'])
     assert.equal((await call(admin, 'POST', 'test')).status, 409)
@@ -136,6 +140,35 @@ test('Zig: acesso admin, token protegido, teste de conexão e prévia sem grava�
     assert.equal(after.zig.lojaId, 'L1')
     await assert.rejects(readFile(env.VERDANT_CUSTOMERS_FILE, 'utf8'), { code: 'ENOENT' })
     await assert.rejects(readFile(env.VERDANT_FINANCE_FILE, 'utf8'), { code: 'ENOENT' })
+
+    failCheckins = false
+    const period = { dtinicio: '2026-10-10', dtfim: '2026-10-10' }
+    assert.equal(JSON.parse(preview.text).preview.plan.creates, 1)
+    assert.equal((await call(admin, 'POST', 'apply', { ...period, expected: { updates: 0, creates: 1 } })).status, 400, 'exige confirmação explícita')
+    const stale = await call(admin, 'POST', 'apply', { ...period, confirm: true, expected: { updates: 0, creates: 5 } })
+    assert.equal(stale.status, 409)
+    await assert.rejects(readFile(env.VERDANT_CUSTOMERS_FILE, 'utf8'), { code: 'ENOENT' })
+    const applied = await call(admin, 'POST', 'apply', { ...period, confirm: true, expected: { updates: 0, creates: 1 } })
+    assert.equal(applied.status, 200, applied.text)
+    assert.ok(!applied.text.includes(TOKEN))
+    const report = JSON.parse(applied.text).report
+    assert.equal(report.created, 1)
+    assert.match(report.backup, /^zig-.*\.json$/)
+    const saved1 = JSON.parse(await readFile(env.VERDANT_CUSTOMERS_FILE, 'utf8'))
+    assert.equal(saved1.length, 1)
+    assert.equal(saved1[0].sourceSystem, 'zig')
+    assert.deepEqual(saved1[0].zigRefs.map((ref) => ref.id), ['z1'])
+    const backup = JSON.parse(await readFile(path.join(env.VERDANT_BACKUP_DIR, report.backup), 'utf8'))
+    assert.deepEqual(backup.customers, [])
+    await assert.rejects(readFile(env.VERDANT_FINANCE_FILE, 'utf8'), { code: 'ENOENT' })
+
+    const again = await call(admin, 'POST', 'apply', { ...period, confirm: true, expected: { updates: 0, creates: 0 } })
+    assert.equal(again.status, 200, again.text)
+    assert.equal(JSON.parse(await readFile(env.VERDANT_CUSTOMERS_FILE, 'utf8')).length, 1, 'não duplica ao gravar de novo')
+    const pending = JSON.parse((await call(admin, 'GET', 'pending')).text)
+    assert.deepEqual(pending.items, [])
+    assert.equal((await call(admin, 'POST', 'pending/resolve', { key: 'inexistente', action: 'ignore' })).status, 404)
+    assert.ok(made.every((item) => item.method === 'GET') && requests.every((item) => item.method === 'GET'))
 
     const cleared = await call(admin, 'PUT', 'config', { clearToken: true })
     assert.equal(JSON.parse(cleared.text).settings.tokenConfigured, false)
