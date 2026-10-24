@@ -18,6 +18,8 @@ import { emptyFinance, validateFinanceStore, changeFinance } from './lib/finance
 import { ZIG_BASE_URL, ZigError, createZigClient, validateToken as validZigToken } from './lib/zig-client.mjs'
 import { buildZigPreview, collectZigData, formatZigPreview, listZigEvents, matchZigData, validatePreviewPeriod } from './lib/zig-preview.mjs'
 import { planEventMerge } from './lib/event-merge.mjs'
+import { buildConversion } from './lib/zig-conversion.mjs'
+import { collectZigSales, formatSalesPreview, planSalesEntries } from './lib/zig-sales.mjs'
 import { ZigApplyError, mergePending, planZigWrites, publicPending, pushRun, resolvePending } from './lib/zig-apply.mjs'
 
 const root = path.dirname(fileURLToPath(import.meta.url))
@@ -1243,6 +1245,25 @@ function applyZigData(data, expected, period) {
   })
 }
 
+// Receita da Zig no Financeiro: só cria lançamentos novos; backup do documento financeiro antes, e nada é gravado se o backup falhar.
+async function applyZigSales(data, expectedCreates, actor) {
+  const document = await readFinanceStore()
+  const references = await financeReferences()
+  const plan = planSalesEntries(data, { lojaId: data.lojaId, existingEntries: document.entries, appEvents: references.events })
+  if (plan.creates.length !== expectedCreates) {
+    throw new ZigApplyError(`Os dados mudaram desde a prévia (agora: ${plan.creates.length} lançamentos novos). Gere a prévia novamente e confirme.`, 409)
+  }
+  const at = new Date().toISOString()
+  let backup = ''
+  if (plan.creates.length) {
+    backup = `zig-finance-${at.replace(/[:.]/g, '-')}.json`
+    await mkdir(backupDirectory, { recursive: true })
+    await writeFile(path.join(backupDirectory, backup), JSON.stringify({ createdAt: at, finance: document }), { encoding: 'utf8', mode: 0o600 })
+    await mutateFinance({ revision: document.revision, entries: plan.creates }, actor)
+  }
+  return { at, period: data.period, backup, created: plan.creates.length, unchanged: plan.unchanged.length, conflicts: plan.conflicts }
+}
+
 function resolveZigPending(key, action, customerId) {
   return queueCustomerWork(async () => {
     const store = await readZigPending()
@@ -2202,6 +2223,48 @@ const server = createServer(async (request, response) => {
           try {
             const data = await collectZigData({ client, lojaId, dtinicio, dtfim })
             return sendJson(response, 200, { report: await applyZigData(data, expected, { dtinicio, dtfim }) })
+          } finally {
+            zigPreviewRunning = false
+          }
+        }
+        if (route === 'conversion' && request.method === 'POST') {
+          const value = await bodyJson(request)
+          const dtinicio = String(value?.dtinicio || '')
+          const dtfim = String(value?.dtfim || '')
+          const invalid = validatePreviewPeriod(dtinicio, dtfim)
+          if (invalid) return sendJson(response, 400, { error: invalid })
+          const { client, lojaId } = await zigContext({ needStore: true })
+          if (zigPreviewRunning) return sendJson(response, 409, { error: 'Já existe uma consulta da Zig em andamento. Aguarde a conclusão.' })
+          zigPreviewRunning = true
+          try {
+            const data = await collectZigData({ client, lojaId, dtinicio, dtfim })
+            const state = await readState()
+            return sendJson(response, 200, { conversion: buildConversion(data, Array.isArray(state?.registrations) ? state.registrations : [], state.events || []), warnings: data.warnings })
+          } finally {
+            zigPreviewRunning = false
+          }
+        }
+        if ((route === 'sales/preview' || route === 'sales/apply') && request.method === 'POST') {
+          const value = await bodyJson(request)
+          const dtinicio = String(value?.dtinicio || '')
+          const dtfim = String(value?.dtfim || '')
+          const invalid = validatePreviewPeriod(dtinicio, dtfim)
+          if (invalid) return sendJson(response, 400, { error: invalid })
+          const applying = route === 'sales/apply'
+          if (applying && (value?.confirm !== true || !Number.isInteger(value?.expected?.creates))) {
+            return sendJson(response, 400, { error: 'Confirme a gravação com o total da prévia (confirm, expected.creates).' })
+          }
+          const { client, lojaId } = await zigContext({ needStore: true })
+          if (zigPreviewRunning) return sendJson(response, 409, { error: 'Já existe uma consulta da Zig em andamento. Aguarde a conclusão.' })
+          zigPreviewRunning = true
+          try {
+            const data = await collectZigSales({ client, lojaId, dtinicio, dtfim })
+            if (!applying) {
+              const [document, references] = await Promise.all([readFinanceStore(), financeReferences()])
+              const plan = planSalesEntries(data, { lojaId, existingEntries: document.entries, appEvents: references.events })
+              return sendJson(response, 200, { preview: formatSalesPreview(data, plan) })
+            }
+            return sendJson(response, 200, { report: await applyZigSales(data, value.expected.creates, zigUser.username) })
           } finally {
             zigPreviewRunning = false
           }

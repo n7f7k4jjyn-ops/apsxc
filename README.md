@@ -104,6 +104,13 @@ Antes de gravar é feito um backup completo de clientes e pendências em `storag
 
 Nome sozinho nunca unifica cadastros; telefone compartilhado, homônimos, documentos conflitantes e múltiplas correspondências ficam para conferência. Próxima etapa: gravar vínculos (ID Zig) e dados complementares após aprovação da prévia.
 
+### Conversão e caixa Zig (somente master)
+
+Na seção “Conversão das listas e caixa” (`POST /api/admin/zig/conversion`, `sales/preview`, `sales/apply`; só consultas GET à Zig):
+
+- **Conversão**: cruza inscritos das listas (por evento do app na mesma data e por lista/`formKey`) com presença na Zig (telefone/documento; nome sozinho não conta; ambíguos ficam de fora). Depende da associação provisória de check-ins por horário.
+- **Caixa → Financeiro** (`GET /erp/saida-produtos`): receita de bar/consumo, couvert e ingressos, uma receita já recebida por evento e tipo (categoria `general`, contraparte “Zig · Verdant”, `externalId` `zig:sales:<loja>:<evento>:<tipo>`). Recargas ZigCard e gorjetas ficam fora da receita; itens estornados não são somados. Gravar exige confirmação, gera backup `zig-finance-*.json` antes (se falhar, nada é gravado), é idempotente, recusa (409) se a prévia mudou e nunca apaga ou sobrescreve; valores diferentes de lançamentos existentes são apenas reportados como conflito.
+
 ## Verificações
 
 ```bash
