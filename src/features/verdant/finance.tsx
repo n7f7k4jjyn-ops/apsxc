@@ -662,7 +662,7 @@ function AdminFinance() {
         </Button>
       )}
       <details className='finance-period-details'>
-        <summary>Período: {from || 'Início'} → {to || 'Hoje'} · {eventId ? eventOptions.find(event=>event.id===eventId)?.name : 'Todos os eventos'} · Alterar filtros</summary>
+        <summary>Período: {from || 'Início'} → {to || 'Fim'} · {eventId ? eventOptions.find(event=>event.id===eventId)?.name : 'Todos os eventos'} · Alterar filtros</summary>
       <Card className='finance-panel'>
         <h2>Período e evento</h2>
         <div className='finance-actions'>
@@ -723,7 +723,7 @@ function AdminFinance() {
         </p>
       </Card>
       </details>
-      {report && <nav className='finance-compact-summary' aria-label='Indicadores financeiros'>{[['Recebido',report.incoming],['Pago',report.outgoing],['Saldo',report.balance],['A pagar',report.payable],['A receber',report.receivable]].map(([label,value])=><button type='button' key={label} onClick={()=>setTab(label==='A pagar'||label==='A receber'?'ledger':'cash')}><span>{label}</span><strong>{formatCents(Number(value))}</strong></button>)}</nav>}
+      {report && <nav className='finance-compact-summary' aria-label='Indicadores financeiros'>{[['Recebido',report.incoming],['Pago',report.outgoing],['Saldo',report.balance],['A pagar',report.payable],['A receber',report.receivable]].map(([label,value])=><button type='button' key={label} onClick={()=>{setSearch('');setCategory('');if(label==='A pagar'||label==='A receber'){setType(label==='A pagar'?'payable':'receivable');setStatus('pending');setTab('ledger')}else{setType('');setStatus('');setTab('cash')}}}><span>{label}</span><strong>{formatCents(Number(value))}</strong></button>)}</nav>}
       {report && (
         <details className='finance-period-details'><summary>Detalhar caixa registrado e pagamentos</summary><section aria-label='Resumo financeiro'>
           <h2>Caixa registrado</h2>
