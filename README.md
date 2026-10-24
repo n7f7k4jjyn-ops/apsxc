@@ -83,7 +83,15 @@ Roteiro de teste com um evento encerrado:
 3. Confira os grupos: vínculo encontrado, cliente novo, divergência e comandas de mesa, além dos campos vazios que a Zig poderia preencher (documento, e-mail, nascimento; documentos aparecem mascarados).
 4. Confirme que Clientes, listas e Financeiro permanecem inalterados.
 
-Premissas (também exibidas na prévia): o `id` do check-in é o userId da Zig, não um identificador único de presença; os check-ins são buscados em janelas de até 5 dias, 50 por página, e qualquer falha interrompe a prévia (nunca há sucesso parcial); como o check-in não traz `eventId`, ele é associado ao evento por horário (de 4 h antes a 16 h após o início, respeitando a virada da meia-noite), premissa a confirmar com a Zig. Nome sozinho nunca unifica cadastros; telefone compartilhado, homônimos, documentos conflitantes e múltiplas correspondências ficam para conferência. Próxima etapa: gravar vínculos (ID Zig) e dados complementares após aprovação da prévia.
+Premissas (também exibidas na prévia): o `id` do check-in é o userId da Zig, não um identificador único de presença; os check-ins são buscados em janelas de até 5 dias, 50 por página, e qualquer falha interrompe a prévia (nunca há sucesso parcial).
+
+Associação check-in/compra ↔ evento (**provisória**, a confirmar com a Zig): como o check-in não traz `eventId`, o registro é associado pelo horário, de 4 h antes a 16 h após o início do evento, respeitando a virada da meia-noite. Só conta como presença o registro associado a **um único evento do período pedido**. Ficam separados em **Presença não confirmada**, sem entrar no cruzamento nem contar como presença: registros fora da janela de qualquer evento e registros compatíveis com mais de um evento (ex.: eventos consecutivos com início próximo). Registros associados a eventos vizinhos (noite anterior ou dias seguintes) são descartados e apenas contados, para não incluir pessoas de outro evento.
+
+Datas consultadas: eventos de 1 dia antes até 2 dias depois do período (contexto para separar noites consecutivas); check-ins de `dtinicio` até `dtfim`+2 (a Zig não documenta se `dtfim` é inclusivo; janelas se sobrepõem em 1 dia e duplicados são removidos); compradores até `dtfim`+1 para cobrir a madrugada, desde que o limite de 5 eventos por consulta seja respeitado — se houver evento no dia seguinte que estoure o limite, a consulta usa só `dtfim` e a prévia avisa que compras da madrugada podem faltar.
+
+Erros da Zig: as mensagens mostradas são sempre locais (por status HTTP); o corpo bruto da resposta nunca é lido nem repassado, pois pode ecoar o token, inclusive truncado.
+
+Nome sozinho nunca unifica cadastros; telefone compartilhado, homônimos, documentos conflitantes e múltiplas correspondências ficam para conferência. Próxima etapa: gravar vínculos (ID Zig) e dados complementares após aprovação da prévia.
 
 ## Verificações
 

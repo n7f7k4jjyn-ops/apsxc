@@ -34,7 +34,7 @@ test('Zig: acesso admin, token protegido, teste de conexão e prévia sem grava�
     if (url.pathname === '/erp/lojas') return response.end(JSON.stringify([{ id: 'L1', name: 'Verdant' }, { id: 'L2', name: 'Outra' }]))
     if (url.pathname === '/erp/events') return response.end(JSON.stringify([{ id: 'E1', name: 'Noite', beginAt: '2026-10-10T22:00:00' }]))
     if (url.pathname === '/erp/checkins') {
-      if (failCheckins) { response.statusCode = 503; return response.end('{}') }
+      if (failCheckins) { response.statusCode = 400; return response.end(JSON.stringify({ message: `bad request for ${TOKEN.slice(0, 10)}... ${TOKEN}` })) }
       return response.end(JSON.stringify([{ id: 'z1', checkinTime: '2026-10-10T23:00:00', name: 'Maria Souza', document: '', phone: '+55 41 99999-1111' }]))
     }
     if (url.pathname === '/erp/compradores') return response.end('[]')
@@ -129,7 +129,7 @@ test('Zig: acesso admin, token protegido, teste de conexão e prévia sem grava�
     const failed = await call(admin, 'POST', 'preview', { dtinicio: '2026-10-10', dtfim: '2026-10-10' })
     assert.equal(failed.status, 502)
     assert.ok(!('preview' in JSON.parse(failed.text)))
-    assert.ok(!failed.text.includes(TOKEN))
+    for (const piece of [TOKEN, TOKEN.slice(0, 10), 'bad request']) assert.ok(!failed.text.includes(piece), `vazou ${piece}`)
     assert.ok(!logs.includes(TOKEN), 'o token não pode aparecer nos logs')
 
     const after = JSON.parse(await readFile(env.VERDANT_INTEGRATIONS_FILE, 'utf8'))

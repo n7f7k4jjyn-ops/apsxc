@@ -33,10 +33,11 @@ type Preview = {
   warnings: string[]
   assumptions: string[]
   events: { id: string; name: string; beginAt: string; inRequestedPeriod: boolean }[]
-  totals: { checkins: number; checkinPages: number; buyers: number; zigPeople: number }
+  totals: { checkins: number; checkinPages: number; buyers: number; zigPeople: number; unconfirmed: number; otherEventOnly: number }
   summary: { linked: number; created: number; divergent: number; tables: number; divergenceReasons: Record<string, number>; fillableFields: Record<string, number> }
-  groups: { linked: Group; created: Group; divergent: Group; tables: Group }
+  groups: { linked: Group; created: Group; divergent: Group; tables: Group; unconfirmed: { items: Unconfirmed[]; total: number; truncated: boolean } }
 }
+type Unconfirmed = { zigId: string | null; name: string; phone: { raw: string }; reason: string; ambiguousCandidates: string[]; outsideRecords: number; ambiguousRecords: number }
 
 const missingLabels: Record<string, string> = { token: 'token de integração', rede: 'identificador da rede', loja: 'loja Verdant' }
 const reasonLabels: Record<string, string> = {
@@ -217,6 +218,18 @@ export function ZigIntegration() {
           <EntryList title='Cliente novo' group={preview.groups.created} />
           <EntryList title='Divergência — conferir manualmente' group={preview.groups.divergent} />
           <EntryList title='Comandas de mesa' group={preview.groups.tables} />
+          <details className='rounded-md border p-3'>
+            <summary className='cursor-pointer text-sm font-medium'>Presença não confirmada ({preview.groups.unconfirmed.total})</summary>
+            <p className='pt-2 text-xs text-muted-foreground'>Registros fora da janela de qualquer evento ou compatíveis com mais de um evento. Não contam como presença e não entram no cruzamento. {preview.totals.otherEventOnly > 0 ? `${preview.totals.otherEventOnly} pessoa(s) de eventos vizinhos foram ignoradas.` : ''}</p>
+            <ul className='max-h-96 space-y-2 overflow-auto pt-3 text-xs'>
+              {preview.groups.unconfirmed.items.map((item, index) => (
+                <li key={`${item.zigId ?? 'x'}-${index}`} className='rounded border p-2'>
+                  <p className='font-medium'>{item.name || '(sem nome)'} <span className='font-normal text-muted-foreground'>· ID Zig {item.zigId ?? '—'} · {item.phone.raw || 'sem telefone'}</span></p>
+                  <p className='text-amber-700 dark:text-amber-300'>{item.reason === 'ambiguous_events' ? `Compatível com mais de um evento (${item.ambiguousCandidates.join(', ')})` : 'Fora da janela de qualquer evento'}</p>
+                </li>
+              ))}
+            </ul>
+          </details>
           <ul className='list-disc space-y-1 pl-5 text-xs text-muted-foreground'>{preview.assumptions.map((item) => <li key={item}>{item}</li>)}</ul>
         </div>
       )}

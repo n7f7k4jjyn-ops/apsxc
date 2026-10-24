@@ -1170,7 +1170,7 @@ async function zigContext({ needStore = false } = {}) {
 }
 
 function sendZigError(response, error) {
-  if (error instanceof ZigError || error?.status) {
+  if (error instanceof ZigError) {
     const status = Number.isInteger(error.status) ? error.status : 502
     return sendJson(response, status, { error: error.message, code: error.code || 'zig_error' })
   }
