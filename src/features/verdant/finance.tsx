@@ -246,7 +246,7 @@ function AdminFinance() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [conflict, setConflict] = useState(false)
-  const [tab, setTab] = useState<'ledger' | 'cash' | 'summary'>('ledger')
+  const [tab, setTab] = useState<'ledger' | 'cash' | 'summary' | 'influencer-payouts' | 'influencer-report'>('ledger')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkEvent, setBulkEvent] = useState('')
   const eventOptions = useMemo(
@@ -628,8 +628,6 @@ function AdminFinance() {
   return (
     <section className='finance-page' aria-label='Financeiro'>
       <ProductionImportPanel onImported={() => void load()} />
-      <InfluencerCommissionsPanel onChanged={() => void load()} />
-      <InfluencerPayoutReportPanel eventId={eventId || undefined} from={from} to={to} />
       <div className='finance-heading'>
         <div>
           <h1>Financeiro</h1>
@@ -771,15 +769,17 @@ function AdminFinance() {
           >
             Resumo financeiro
           </Button>
-          <Button
+          <Button variant={tab === 'influencer-payouts' ? 'default' : 'outline'} aria-pressed={tab === 'influencer-payouts'} onClick={() => setTab('influencer-payouts')}>Repasses de influencers</Button>
+          <Button variant={tab === 'influencer-report' ? 'default' : 'outline'} aria-pressed={tab === 'influencer-report'} onClick={() => setTab('influencer-report')}>Relatório de repasses</Button>
+          {(tab === 'ledger' || tab === 'cash') && <Button
             variant='outline'
-            disabled={!report || busy || tab === 'summary'}
+            disabled={!report || busy}
             onClick={exportCsv}
           >
             Exportar CSV
-          </Button>
+          </Button>}
         </div>
-        {tab === 'summary' ? <ZigEventSummary from={from} to={to} /> : (
+        {tab === 'influencer-payouts' ? <InfluencerCommissionsPanel onChanged={() => void load()} /> : tab === 'influencer-report' ? <InfluencerPayoutReportPanel eventId={eventId || undefined} from={from} to={to} /> : tab === 'summary' ? <ZigEventSummary from={from} to={to} /> : (
         <>
         <div className='finance-grid'>
           <Field id='finance-type-filter' label='Filtrar tipo'>
