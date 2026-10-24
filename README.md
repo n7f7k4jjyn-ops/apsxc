@@ -104,6 +104,10 @@ Antes de gravar é feito um backup completo de clientes e pendências em `storag
 
 Nome sozinho nunca unifica cadastros; telefone compartilhado, homônimos, documentos conflitantes e múltiplas correspondências ficam para conferência. Próxima etapa: gravar vínculos (ID Zig) e dados complementares após aprovação da prévia.
 
+### Resumo financeiro por evento (Financeiro → Resumo financeiro)
+
+“Salvar resumo dos eventos” (`POST /api/admin/zig/report/save`, master) grava, por evento Zig do período, pessoas na casa, inscritos, vindos pela lista, conversão, total, bar, couvert/ingressos e ticket médio (receita ÷ pessoas na casa) em `storage/zig-reports.json` (`VERDANT_ZIG_REPORTS_FILE`). Nunca apaga; reexecutar atualiza. A aba lê `GET /api/finance/zig-reports` (`finance:manage`). Eventos passados sem evento no app trazem casa, receita e ticket da Zig; inscritos e conversão ficam “—”.
+
 ### Conversão e caixa Zig (somente master)
 
 Na seção “Conversão das listas e caixa” (`POST /api/admin/zig/conversion`, `sales/preview`, `sales/apply`; só consultas GET à Zig):

@@ -41,6 +41,7 @@ export function ZigSalesConversion() {
   const [conversion, setConversion] = useState<Conversion | null>(null)
   const [sales, setSales] = useState<SalesPreview | null>(null)
   const [report, setReport] = useState<SalesReport | null>(null)
+  const [saved, setSaved] = useState('')
 
   async function run<T>(name: string, action: () => Promise<T>) {
     setBusy(name)
@@ -55,6 +56,15 @@ export function ZigSalesConversion() {
     event.preventDefault()
     const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null
     setReport(null)
+    setSaved('')
+    if (submitter?.value === 'report') {
+      const result = await run('report', () => api<{ saved: { added: number; updated: number; events: number }; warnings: string[] }>('report/save', { dtinicio, dtfim }))
+      if (result) {
+        setSaved(`Resumo salvo: ${result.saved.added} evento(s) novo(s), ${result.saved.updated} atualizado(s). Veja em Financeiro → Resumo financeiro.${result.warnings.length ? ` Avisos: ${result.warnings.join(' | ')}` : ''}`)
+        toast.success('Resumo dos eventos salvo.')
+      }
+      return
+    }
     if (submitter?.value === 'sales') {
       setSales(null)
       const result = await run('sales', () => api<{ preview: SalesPreview }>('sales/preview', { dtinicio, dtfim }))
@@ -80,13 +90,15 @@ export function ZigSalesConversion() {
   return (
     <form onSubmit={submit} className='space-y-3 rounded-md border p-3'>
       <h3 className='text-sm font-semibold'>Conversão das listas e caixa</h3>
-      <p className='text-xs text-muted-foreground'>Use um evento já encerrado (no máximo 5 eventos). Conversão: quem se inscreveu nas listas e teve presença confirmada na Zig. Caixa: receita de bar, couvert e ingressos lançada no Financeiro como receita já recebida, com confirmação e backup. Recargas, gorjetas e estornos não entram como receita.</p>
+      <p className='text-xs text-muted-foreground'>Use um evento já encerrado (no máximo 5 eventos). Conversão: quem se inscreveu nas listas e teve presença confirmada na Zig. Caixa: receita de bar, couvert e ingressos lançada no Financeiro como receita já recebida, com confirmação e backup. Recargas, gorjetas e estornos não entram como receita. “Salvar resumo dos eventos” guarda público, listas, receita e ticket médio de cada evento (mesmo sem evento criado no app) para a aba Financeiro → Resumo financeiro; não altera lançamentos.</p>
       <div className='flex flex-wrap items-end gap-3'>
         <label className='space-y-1 text-sm font-medium'>Data inicial<Input type='date' value={dtinicio} onChange={(event) => setDtinicio(event.target.value)} required /></label>
         <label className='space-y-1 text-sm font-medium'>Data final<Input type='date' value={dtfim} onChange={(event) => setDtfim(event.target.value)} required /></label>
         <Button type='submit' value='conversion' disabled={busy !== ''}>{busy === 'conversion' ? 'Consultando…' : 'Calcular conversão'}</Button>
         <Button type='submit' value='sales' variant='outline' disabled={busy !== ''}>{busy === 'sales' ? 'Consultando…' : 'Prévia do caixa'}</Button>
-      </div>
+                <Button type='submit' value='report' variant='outline' disabled={busy !== ''}>{busy === 'report' ? 'Salvando…' : 'Salvar resumo dos eventos'}</Button>
+              </div>
+              {saved && <p role='status' className='text-sm text-emerald-700 dark:text-emerald-300'>{saved}</p>}
       {error && <p role='alert' className='text-sm text-destructive'>{error}</p>}
 
       {conversion && (

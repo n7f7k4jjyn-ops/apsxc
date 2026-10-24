@@ -20,6 +20,7 @@ import { buildZigPreview, collectZigData, formatZigPreview, listZigEvents, match
 import { planEventMerge } from './lib/event-merge.mjs'
 import { buildConversion } from './lib/zig-conversion.mjs'
 import { collectZigSales, formatSalesPreview, planSalesEntries } from './lib/zig-sales.mjs'
+import { buildEventReports, normalizeReportStore, upsertReports } from './lib/zig-report.mjs'
 import { ZigApplyError, mergePending, planZigWrites, publicPending, pushRun, resolvePending } from './lib/zig-apply.mjs'
 
 const root = path.dirname(fileURLToPath(import.meta.url))
@@ -41,6 +42,7 @@ let teamRegistrationQueue = Promise.resolve()
 const operationsPath = process.env.VERDANT_OPERATIONS_FILE || path.join(root,'storage','operations.json')
 const financePath = process.env.VERDANT_FINANCE_FILE || path.join(root, 'storage', 'finance.json')
 const zigPendingPath = process.env.VERDANT_ZIG_PENDING_FILE || path.join(root, 'storage', 'zig-pending.json')
+const zigReportsPath = process.env.VERDANT_ZIG_REPORTS_FILE || path.join(root, 'storage', 'zig-reports.json')
 const backupDirectory = process.env.VERDANT_BACKUP_DIR || path.join(root, 'storage', 'backups')
 let financeQueue = Promise.resolve()
 let operationsQueue = Promise.resolve()
@@ -136,6 +138,7 @@ function jsonStoreKey(filePath) {
   if (resolved === path.resolve(chatsPath)) return 'team_chats'
   if (resolved === path.resolve(integrationsPath)) return 'integrations'
   if (resolved === path.resolve(zigPendingPath)) return 'zig_pending'
+  if (resolved === path.resolve(zigReportsPath)) return 'zig_reports'
   if (resolved === path.resolve(customersPath)) return 'customers_legacy'
   return ''
 }
@@ -1676,6 +1679,9 @@ const server = createServer(async (request, response) => {
       if (request.headers['sec-fetch-site'] === 'cross-site' || (origin && ![
         `http://${request.headers.host}`, `https://${request.headers.host}`,
       ].includes(origin))) return sendJson(response, 403, { error: 'Origem não autorizada.' })
+      if (request.method === 'GET' && url.pathname === '/api/finance/zig-reports') {
+        return sendJson(response, 200, normalizeReportStore(await readJsonFile(zigReportsPath, {})))
+      }
       if (request.method === 'GET' && url.pathname === '/api/finance') {
         const document = await readFinanceStore()
         return sendJson(response, 200, { ...document, ...await financeReferences() })
@@ -2265,6 +2271,28 @@ const server = createServer(async (request, response) => {
               return sendJson(response, 200, { preview: formatSalesPreview(data, plan) })
             }
             return sendJson(response, 200, { report: await applyZigSales(data, value.expected.creates, zigUser.username) })
+          } finally {
+            zigPreviewRunning = false
+          }
+        }
+        if (route === 'report/save' && request.method === 'POST') {
+          const value = await bodyJson(request)
+          const dtinicio = String(value?.dtinicio || '')
+          const dtfim = String(value?.dtfim || '')
+          const invalid = validatePreviewPeriod(dtinicio, dtfim)
+          if (invalid) return sendJson(response, 400, { error: invalid })
+          const { client, lojaId } = await zigContext({ needStore: true })
+          if (zigPreviewRunning) return sendJson(response, 409, { error: 'Já existe uma consulta da Zig em andamento. Aguarde a conclusão.' })
+          zigPreviewRunning = true
+          try {
+            const data = await collectZigData({ client, lojaId, dtinicio, dtfim })
+            const sales = await collectZigSales({ client, lojaId, dtinicio, dtfim })
+            const state = await readState()
+            const conversion = buildConversion(data, Array.isArray(state?.registrations) ? state.registrations : [], state.events || [])
+            const reports = buildEventReports({ lojaId, conversion, sales, savedAt: new Date().toISOString() })
+            const { store, added, updated } = upsertReports(normalizeReportStore(await readJsonFile(zigReportsPath, {})), reports)
+            await writeJsonFile(zigReportsPath, store)
+            return sendJson(response, 200, { saved: { added, updated, events: reports.length }, warnings: [...data.warnings, ...sales.warnings, ...conversion.notes] })
           } finally {
             zigPreviewRunning = false
           }

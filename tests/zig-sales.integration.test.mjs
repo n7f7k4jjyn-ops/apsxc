@@ -63,7 +63,7 @@ test('Zig: conversão lista → presença e receita no Financeiro com backup e s
     VERDANT_USERS_JSON: JSON.stringify(['eibrnof', 'admin'].map((name) => ({ username: name, role: 'admin', passwordHash }))),
   }
   for (const key of ['DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASSWORD', 'VERDANT_ADMIN_USERNAME']) delete env[key]
-  for (const key of ['DATA', 'SESSIONS', 'TASKS', 'CONTENT_PLAN', 'PREFERENCES', 'TEAM_USERS', 'CHATS', 'CUSTOMERS', 'INTEGRATIONS', 'JOB_APPLICATIONS', 'TEAM_REGISTRATIONS', 'OPERATIONS', 'FINANCE', 'ZIG_PENDING']) {
+  for (const key of ['DATA', 'SESSIONS', 'TASKS', 'CONTENT_PLAN', 'PREFERENCES', 'TEAM_USERS', 'CHATS', 'CUSTOMERS', 'INTEGRATIONS', 'JOB_APPLICATIONS', 'TEAM_REGISTRATIONS', 'OPERATIONS',   'FINANCE', 'ZIG_PENDING', 'ZIG_REPORTS']) {
     env[`VERDANT_${key}_FILE`] = path.join(directory, `${key.toLowerCase()}.json`)
   }
   env.VERDANT_BACKUP_DIR = path.join(directory, 'backups')
@@ -142,6 +142,19 @@ test('Zig: conversão lista → presença e receita no Financeiro com backup e s
     assert.equal(again.created, 0)
     assert.equal(again.unchanged, 2)
     assert.equal((await (await fetch(`${url}/api/finance`, { headers: { Cookie: admin } })).json()).entries.length, 2)
+    assert.equal((await call(other, 'report/save', period)).status, 403)
+    const reportSaved = JSON.parse((await call(admin, 'report/save', period)).text).saved
+    assert.deepEqual([reportSaved.added, reportSaved.updated], [1, 0])
+    assert.equal(JSON.parse((await call(admin, 'report/save', period)).text).saved.updated, 1)
+    const reports = (await (await fetch(`${url}/api/finance/zig-reports`, { headers: { Cookie: admin } })).json()).reports
+    assert.equal(reports.length, 1)
+    assert.equal(reports[0].presentInHouse, 2)
+    assert.equal(reports[0].registered, 2)
+    assert.equal(reports[0].cameFromLists, 1)
+    assert.equal(reports[0].totalCents, 5500)
+    assert.equal(reports[0].avgTicketCents, 2750)
+    assert.equal((await fetch(`${url}/api/finance/zig-reports`, { headers: { Cookie: other } })).status, 200)
+    assert.equal((await fetch(`${url}/api/finance/zig-reports`)).status, 401)
     assert.ok(!logs.includes(TOKEN))
   } finally {
     child.kill()
