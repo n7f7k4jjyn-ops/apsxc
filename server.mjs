@@ -519,7 +519,7 @@ async function financeReferences() {
       ...team.map(person => ({ id: `team:${person.id}`, name: person.name, kind: 'team', ...(person.pixKey ? { pixKey: person.pixKey } : {}) })),
       ...(state.people || []).filter(person => person.kind === 'DJ').map(person => ({ id: `dj:${person.id}`, name: person.name, kind: 'dj' })),
     ],
-    events: state.events.map(event => ({ id: event.id, name: event.name, date: event.date })),
+    events: state.events.map(event => ({ id: event.id, name: event.name, date: event.date, eventTime: event.eventTime })),
   }
 }
 

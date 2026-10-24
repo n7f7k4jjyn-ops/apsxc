@@ -119,7 +119,7 @@ function isLedger(value: unknown): value is Pick<
           'updatedAt',
         ].every((key) => typeof entry[key] === 'string') &&
         ['payable', 'receivable'].includes(String(entry.type)) &&
-        ['general', 'team', 'dj'].includes(String(entry.category)) &&
+        ['general', 'team', 'dj', 'sales'].includes(String(entry.category)) &&
         ['pending', 'settled', 'cancelled'].includes(String(entry.status)) &&
         ['', 'cash', 'pix', 'transfer', 'card', 'other'].includes(
           String(entry.paymentMethod)
@@ -1038,7 +1038,7 @@ function AdminFinance() {
                     <option value='payable'>A pagar</option>
                     <option
                       value='receivable'
-                      disabled={draft.category !== 'general'}
+                      disabled={draft.category === 'team' || draft.category === 'dj'}
                     >
                       A receber
                     </option>
@@ -1057,6 +1057,9 @@ function AdminFinance() {
                     }}
                   >
                     <option value='general'>Geral</option>
+                    <option value='sales' disabled={draft.type !== 'receivable'}>
+                      Vendas Zig
+                    </option>
                     <option value='team' disabled={draft.type !== 'payable'}>
                       Equipe
                     </option>
@@ -1082,12 +1085,12 @@ function AdminFinance() {
                     id='finance-counterparty'
                     required
                     maxLength={200}
-                    readOnly={draft.category !== 'general'}
+                    readOnly={draft.category === 'team' || draft.category === 'dj'}
                     value={draft.counterparty}
                     onChange={(e) => change('counterparty', e.target.value)}
                   />
                 </Field>
-                {draft.category !== 'general' && (
+                {(draft.category === 'team' || draft.category === 'dj') && (
                   <Field id='finance-beneficiary' label='Beneficiário'>
                     <select
                       id='finance-beneficiary'

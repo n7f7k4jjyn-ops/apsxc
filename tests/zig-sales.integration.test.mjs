@@ -136,7 +136,7 @@ test('Zig: conversão lista → presença e receita no Financeiro com backup e s
     assert.ok((await readdir(env.VERDANT_BACKUP_DIR)).includes(applied.backup))
     const finance = await (await fetch(`${url}/api/finance`, { headers: { Cookie: admin } })).json()
     assert.deepEqual(finance.entries.map((entry) => entry.amountCents).sort(), [2500, 3000])
-    assert.ok(finance.entries.every((entry) => entry.type === 'receivable' && entry.status === 'settled' && entry.eventId === seedEvent.id && entry.externalId.startsWith('zig:sales:L1:E1:')))
+    assert.ok(finance.entries.every((entry) => entry.type === 'receivable' && entry.status === 'settled' && entry.eventId === seedEvent.id && entry.category === 'sales' && entry.externalId.startsWith('zig:sales:L1:E1:')))
 
     const again = JSON.parse((await call(admin, 'sales/apply', { ...period, confirm: true, expected: { creates: 0 } })).text).report
     assert.equal(again.created, 0)

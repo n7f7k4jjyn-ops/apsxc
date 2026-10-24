@@ -10,7 +10,7 @@
     "auth:hash": "node scripts/hash-password.mjs",
     "lint": "eslint .",
     "test:e2e:zig": "node scripts/zig-e2e.mjs",
-    "test:server": "node tests/server.integration.test.mjs && node lib/public-form-meta.test.mjs && node lib/registry.test.mjs && node lib/rosters.test.mjs && node --test lib/finance.test.mjs tests/finance.integration.test.mjs lib/zig-client.test.mjs lib/zig-matching.test.mjs lib/zig-apply.test.mjs lib/event-merge.test.mjs tests/zig.integration.test.mjs tests/zig-sales.integration.test.mjs",
+    "test:server": "node tests/server.integration.test.mjs && node lib/public-form-meta.test.mjs && node lib/registry.test.mjs && node lib/rosters.test.mjs && node --test lib/finance.test.mjs tests/finance.integration.test.mjs lib/zig-client.test.mjs lib/zig-matching.test.mjs lib/zig-apply.test.mjs lib/event-merge.test.mjs lib/zig-sales.test.mjs tests/zig.integration.test.mjs tests/zig-sales.integration.test.mjs",
     "preview": "vite preview",
     "format:check": "prettier --check .",
     "format": "prettier --write .",
