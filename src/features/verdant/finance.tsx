@@ -280,6 +280,7 @@ function AdminFinance() {
   const lock = useRef(false)
   const active = useRef(true)
   const manualId = useRef('')
+  const importTools = useRef<HTMLDetailsElement>(null)
 
   async function load(signal?: AbortSignal) {
     setValid(false)
@@ -640,9 +641,11 @@ function AdminFinance() {
             realiza transferências.
           </p>
         </div>
+        <div className='finance-actions'><Button variant='outline' onClick={()=>{if(importTools.current){importTools.current.open=true;importTools.current.scrollIntoView({behavior:'smooth',block:'start'})}}}>Importar dados</Button>
         <Button disabled={disabled} onClick={() => open()}>
           Novo lançamento
         </Button>
+        </div>
       </div>
       {loading && <p role='status'>Carregando financeiro…</p>}
       {loadError && (
@@ -929,6 +932,7 @@ function AdminFinance() {
         </>
         )}
       </Card>
+      <details ref={importTools} id='finance-import-tools' className='finance-period-details finance-import-tools'><summary>Importar dados · Produção, equipe e financeiro</summary>
       <ProductionImportPanel onImported={() => void load()} />
       <Card className='finance-panel'>
         <h2>Importar planilha</h2>
@@ -1080,6 +1084,7 @@ function AdminFinance() {
           </div>
         </details>
       </Card>
+      </details>
       <Dialog
         open={!!draft}
         onOpenChange={(value) => {

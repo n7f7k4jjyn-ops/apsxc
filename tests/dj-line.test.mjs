@@ -43,5 +43,15 @@ test('second set appears in print and replacement retains historical registratio
  assert.deepEqual(next.registrations,state.registrations)
  assert.equal(state.people.find(p=>p.id==='b').eventIds.includes('event'),true)
  assert.match(djLineSections(djLineRows(next,'event'))[0].groups[0].names[0],/2º: 03:00/)
- assert.throws(()=>applyDjLine(state,'event',[rows[0],{...rows[1],id:'c'}]),/mesmo DJ/)
+ assert.throws(()=>applyDjLine(state,'event',[rows[0],{...rows[1],id:'c',track:'LAND'}]),/mesmo DJ/)
+})
+
+test('same DJ on SKY and LAND keeps independent sets through edit and print',()=>{
+ const state=fixture();state.people[0].eventDetails.event.additionalSets=[{track:'LAND',order:1,time:'02:00',secondTime:'04:00'}]
+ const rows=djLineRows(state,'event')
+ assert.equal(rows.filter(row=>row.id==='a').length,2)
+ const edited=applyDjLine(state,'event',rows.map(row=>({...row,originalId:row.slotKey,originalPersonId:row.id})))
+ assert.equal(djLineRows(edited,'event').filter(row=>row.id==='a').length,2)
+ assert.equal(djLineSections(djLineRows(edited,'event')).length,2)
+ assert.deepEqual(edited.registrations,state.registrations)
 })

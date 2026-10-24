@@ -3,6 +3,7 @@ import type { PortariaSection } from './portaria-pdf'
 
 export type DjLineRow = {
   id: string
+  slotKey?: string
   name: string
   track: string
   time: string
@@ -26,14 +27,22 @@ export function djLineRows(
   }
   return data.people
     .filter((p) => p.kind === 'DJ' && p.eventIds.includes(eventId))
-    .map((p) => ({
-      id: p.id,
-      name: p.name,
-      track: p.eventDetails[eventId]?.track || '',
-      time: p.eventDetails[eventId]?.time || '',
-      secondTime: p.eventDetails[eventId]?.secondTime || '',
-      order: p.eventDetails[eventId]?.order || 0,
-    }))
+    .flatMap((p) => {
+      const detail = p.eventDetails[eventId] || {
+        track: '',
+        time: '',
+        order: 0,
+      }
+      return [detail, ...(detail.additionalSets || [])].map((set, index) => ({
+        id: p.id,
+        slotKey: `${p.id}:${index}`,
+        name: p.name,
+        track: set.track || '',
+        time: set.time || '',
+        secondTime: set.secondTime || '',
+        order: set.order || 0,
+      }))
+    })
     .sort(
       (a, b) =>
         a.track.localeCompare(b.track, 'pt-BR') ||
@@ -96,12 +105,15 @@ export function validateDjOrder(rows: DjLineRow[]) {
 export function applyDjLine(
   state: VerdantState,
   eventId: string,
-  rows: (DjLineRow & { originalId: string })[]
+  rows: (DjLineRow & { originalId: string; originalPersonId?: string })[]
 ): VerdantState {
   validateDjOrder(rows)
-  if (new Set(rows.map((row) => row.id)).size !== rows.length)
+  if (
+    new Set(rows.map((row) => `${row.id}|${row.track.trim().toUpperCase()}`))
+      .size !== rows.length
+  )
     throw new Error(
-      'O mesmo DJ não pode ocupar duas posições. Use o segundo horário.'
+      'O mesmo DJ não pode ocupar duas posições na mesma pista. Use o segundo horário.'
     )
   for (const row of rows) {
     if (
@@ -115,11 +127,14 @@ export function applyDjLine(
     if (row.secondTime && !/^([01]\d|2[0-3]):[0-5]\d$/.test(row.secondTime))
       throw new Error('Informe um segundo horário válido.')
   }
-  const originals = new Set(rows.map((row) => row.originalId))
+  const originals = new Set(
+    rows.map((row) => row.originalPersonId || row.originalId)
+  )
   return {
     ...state,
     people: state.people.map((person) => {
-      const row = rows.find((item) => item.id === person.id)
+      const slots = rows.filter((item) => item.id === person.id)
+      const row = slots[0]
       if (row)
         return {
           ...person,
@@ -131,6 +146,14 @@ export function applyDjLine(
               time: row.time,
               secondTime: row.secondTime || '',
               order: row.order,
+              additionalSets: slots
+                .slice(1)
+                .map((set) => ({
+                  track: set.track,
+                  time: set.time,
+                  secondTime: set.secondTime || '',
+                  order: set.order,
+                })),
             },
           },
         }

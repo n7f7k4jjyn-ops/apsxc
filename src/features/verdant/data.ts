@@ -19,7 +19,7 @@ export type VerdantEvent = {
   active: boolean
 }
 
-export type EventDetails = { track: string; time: string; secondTime?: string; order: number }
+export type EventDetails = { track: string; time: string; secondTime?: string; order: number; additionalSets?: {track: string; time: string; secondTime?: string; order: number}[] }
 export type Person = {
   id: string
   kind: 'DJ' | 'INFLUENCIADORES'

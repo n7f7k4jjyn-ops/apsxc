@@ -7,6 +7,7 @@ import {
   planProductionImport,
   readProductionBundle,
   type ImportedTeam,
+  type ProductionEventBindings,
   type ProductionBundle,
 } from './production-import'
 
@@ -55,10 +56,13 @@ export function ProductionImportPanel({
     plan: ReturnType<typeof planProductionImport>
     snapshot: Awaited<ReturnType<typeof snapshot>>
   }>()
+  const [bindings, setBindings] = useState<ProductionEventBindings>({})
+  const [createHistoricalEvents, setCreateHistoricalEvents] = useState(true)
+  const [bindingChanges, setBindingChanges] = useState(false)
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
   const lock = useRef(false)
-  async function review(input = bundle) {
+  async function review(input = bundle, eventBindings = bindings) {
     if (!input || lock.current) return
     lock.current = true
     setBusy(true)
@@ -71,10 +75,13 @@ export function ProductionImportPanel({
           input,
           current.state,
           current.team,
-          current.finance
+          current.finance,
+          eventBindings,
+          createHistoricalEvents
         ),
         snapshot: current,
       })
+      setBindingChanges(false)
     } catch (e) {
       setMessage((e as Error).message)
     } finally {
@@ -83,7 +90,7 @@ export function ProductionImportPanel({
     }
   }
   async function apply() {
-    if (!preview || lock.current) return
+    if (!preview || bindingChanges || lock.current) return
     lock.current = true
     setBusy(true)
     try {
@@ -146,6 +153,22 @@ export function ProductionImportPanel({
         pagamentos existentes. Eventos e DJs novos entram inativos; a
         disponibilidade da equipe é histórica e precisa ser confirmada.
       </p>
+      <label className='flex items-start gap-2'>
+        <input
+          type='checkbox'
+          checked={createHistoricalEvents}
+          disabled={busy}
+          onChange={(event) => {
+            setCreateHistoricalEvents(event.target.checked)
+            setBindingChanges(true)
+          }}
+        />
+        <span>
+          Criar eventos históricos quando não houver correspondência de data e
+          nome. Entram inativos, sem dados de conversão; eventos já reconhecidos
+          são reutilizados. Confira os eventos previstos antes de importar.
+        </span>
+      </label>
       <label>
         Pacote de produção{' '}
         <input
@@ -154,6 +177,8 @@ export function ProductionImportPanel({
           disabled={busy}
           onChange={async (event) => {
             const file = event.target.files?.[0]
+            setBindings({})
+            setBindingChanges(false)
             setBundle(undefined)
             setPreview(undefined)
             setMessage('')
@@ -163,7 +188,7 @@ export function ProductionImportPanel({
                 throw new Error('O pacote deve ter até 20 MB.')
               const input = readProductionBundle(JSON.parse(await file.text()))
               setBundle(input)
-              await review(input)
+              await review(input, {})
             } catch (e) {
               setMessage((e as Error).message)
             }
@@ -198,7 +223,55 @@ export function ProductionImportPanel({
               </ul>
             </details>
           )}
-          <Button disabled={busy} onClick={() => void apply()}>
+          {!!preview.plan.eventBindings.length && (
+            <div className='grid gap-3 rounded-lg border p-3'>
+              <h3>Vincular eventos existentes</h3>
+              <p>
+                Escolha o evento da mesma data. Eventos diferentes permanecem
+                separados. Cada escolha vale para todas as apresentações e
+                pagamentos desse evento.
+              </p>
+              {preview.plan.eventBindings.map((row) => (
+                <label key={row.key} className='finance-field'>
+                  {row.date} · {row.name}
+                  <select
+                    value={bindings[row.key] || ''}
+                    onChange={(event) => {
+                      setBindings((current) => ({
+                        ...current,
+                        [row.key]: event.target.value,
+                      }))
+                      setBindingChanges(true)
+                    }}
+                  >
+                    <option value=''>Manter pendente</option>
+                    {row.candidates.map((event) => (
+                      <option key={event.id} value={event.id}>
+                        {event.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ))}
+              <Button disabled={busy} onClick={() => void review()}>
+                Atualizar prévia com os vínculos
+              </Button>
+            </div>
+          )}
+          {bindingChanges && (
+            <Button disabled={busy} onClick={() => void review()}>
+              Recalcular prévia da importação
+            </Button>
+          )}
+          {bindingChanges && (
+            <p role='status'>
+              Atualize a prévia para aplicar os vínculos antes de importar.
+            </p>
+          )}
+          <Button
+            disabled={busy || bindingChanges}
+            onClick={() => void apply()}
+          >
             Criar backup e importar os registros conciliados
           </Button>
         </>
