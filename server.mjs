@@ -1687,7 +1687,7 @@ const server = createServer(async (request, response) => {
         response.setHeader('Cache-Control', 'no-store')
         return sendJson(response, 200, {
           admissions: operations.influencerAdmissions || [],
-          registrations: state.registrations.filter(r => r.formKey === 'INFLUENCIADORES').map(r => ({ id: r.id, name: r.name, eventId: r.eventId, eventName: r.eventName, eventDate: r.eventDate, influencer: r.optionName })),
+          registrations: state.registrations.filter(r => r.formKey === 'INFLUENCIADORES').map(r => ({ id: r.id, name: r.name, eventId: r.eventId, eventName: r.eventName, eventDate: r.eventDate, influencerId: r.optionId, influencer: r.optionName })),
         })
       }
       if (request.method === 'POST' && url.pathname === '/api/finance/influencer-admissions') {

@@ -38,6 +38,7 @@ import './finance.css'
 import { ZigEventSummary } from './zig-event-summary'
 import { ProductionImportPanel } from './production-import-panel'
 import { InfluencerCommissionsPanel } from './influencer-commissions-panel'
+import { InfluencerPayoutReportPanel } from './influencer-payout-report-panel'
 
 const blank = (): FinanceDraft => ({
   externalId: `manual:${crypto.randomUUID()}`,
@@ -628,6 +629,7 @@ function AdminFinance() {
     <section className='finance-page' aria-label='Financeiro'>
       <ProductionImportPanel onImported={() => void load()} />
       <InfluencerCommissionsPanel onChanged={() => void load()} />
+      <InfluencerPayoutReportPanel eventId={eventId || undefined} from={from} to={to} />
       <div className='finance-heading'>
         <div>
           <h1>Financeiro</h1>
