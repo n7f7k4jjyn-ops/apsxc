@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Input } from '@/components/ui/input'
 import { formatCents } from './finance-data'
 
 type ListRow = { list: string; registered: number; came: number; conversionPercent: number | null }
@@ -18,11 +17,9 @@ const pct = (value: number | null) => (value === null ? dash : `${value.toLocale
 const money = (value: number | null) => (value === null ? dash : formatCents(value))
 const dateLabel = (value: string) => value.split('-').reverse().join('/')
 
-export function ZigEventSummary() {
+export function ZigEventSummary({ from, to }: { from: string; to: string }) {
   const [reports, setReports] = useState<EventReport[] | null>(null)
   const [error, setError] = useState('')
-  const [from, setFrom] = useState('')
-  const [to, setTo] = useState('')
 
   useEffect(() => {
     let active = true
@@ -73,10 +70,7 @@ export function ZigEventSummary() {
       <p>
         Dados vindos da Zig e das listas, gravados em Apps → Zig → “Salvar resumo dos eventos”. Eventos antigos sem evento criado no app aparecem com público e receita da Zig; inscritos e conversão ficam com “—”, pois não há lista para cruzar. Ticket médio = receita (bar, couvert e ingressos) ÷ pessoas na casa; recargas, gorjetas e estornos ficam fora.
       </p>
-      <div className='finance-grid'>
-        <label>Data inicial<Input type='date' value={from} onChange={(event) => setFrom(event.target.value)} /></label>
-        <label>Data final<Input type='date' value={to} onChange={(event) => setTo(event.target.value)} /></label>
-      </div>
+      <p>Período: {from ? dateLabel(from) : 'início'} a {to ? dateLabel(to) : 'hoje'} (filtro “Período e evento” acima, o mesmo da aba Lista).</p>
       {!reports.length && <p>Nenhum resumo salvo ainda.</p>}
       {reports.length > 0 && (
         <>
