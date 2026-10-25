@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { createServer } from 'node:net'
+import { request as httpRequest } from 'node:http'
+import { brotliDecompressSync, gunzipSync } from 'node:zlib'
 import { createHash, randomBytes, scryptSync } from 'node:crypto'
 import { once } from 'node:events'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
@@ -112,6 +114,35 @@ test('DB_PORT alone keeps the server in JSON storage mode', { timeout: 15000 }, 
     const health = await fetch(`http://127.0.0.1:${port}/api/health`)
     assert.equal(health.status, 200)
     assert.equal((await health.json()).storage, 'json')
+    const html = await readFile(path.join(projectRoot, 'dist/index.html'), 'utf8')
+    const assetPath = html.match(/src="([^" ]+\.js)"/)[1]
+    const original = await readFile(path.join(projectRoot, 'dist', assetPath))
+    const raw = (encoding, method = 'GET', pathname = assetPath) => new Promise((resolve, reject) => {
+      const request = httpRequest(`http://127.0.0.1:${port}${pathname}`, { method, headers: { 'Accept-Encoding': encoding } }, response => {
+        const chunks = []
+        response.on('data', chunk => chunks.push(chunk))
+        response.on('end', () => resolve({ headers: response.headers, body: Buffer.concat(chunks), status: response.statusCode }))
+      })
+      request.on('error', reject)
+      request.end()
+    })
+    for (const [encoding, decode] of [['br', brotliDecompressSync], ['gzip', gunzipSync]]) {
+      const result = await raw(encoding)
+      assert.equal(result.status, 200)
+      assert.equal(result.headers['content-encoding'], encoding)
+      assert.equal(result.headers.vary, 'Accept-Encoding')
+      assert.match(result.headers['cache-control'], /immutable/)
+      assert.deepEqual(decode(result.body), original)
+      assert.ok(result.body.length < original.length / 2)
+      const head = await raw(encoding, 'HEAD')
+      assert.equal(head.body.length, 0)
+      assert.equal(head.headers['content-length'], String(result.body.length))
+    }
+    assert.deepEqual((await raw('gzip;q=0, br;q=0')).body, original)
+    const form = await raw('br, gzip', 'GET', '/lista/lovers')
+    assert.equal(form.headers['content-encoding'], undefined)
+    assert.match(form.body.toString(), /Lovers/i)
+
   } finally {
     await stopServer(child)
     await rm(directory, { recursive: true, force: true })

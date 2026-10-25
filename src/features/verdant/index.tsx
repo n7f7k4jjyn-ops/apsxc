@@ -5,17 +5,17 @@ import { MonthFilter } from './month-filter'
 import { monthRange } from './month-range'
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { ColumnFilterControl, SortButton, SortableTableHeader } from './list-controls'
-import { RostersPage } from './rosters'
-import { FinancePage } from './finance'
+const RostersPage = lazy(() => import('./rosters').then(module => ({ default: module.RostersPage })))
+const FinancePage = lazy(() => import('./finance').then(module => ({ default: module.FinancePage })))
 import { useAuthStore } from '@/stores/auth-store'
-import { InfluencerPayoutReportPanel } from './influencer-payout-report-panel'
+const InfluencerPayoutReportPanel = lazy(() => import('./influencer-payout-report-panel').then(module => ({ default: module.InfluencerPayoutReportPanel })))
 import { birthdayDoorGroup, birthdayGuestNames } from './birthday-guests'
 import { professionalDoorList } from './professional-door-list'
 import { djLineRows, djLineSections, djGuests } from './dj-line'
 import { DjLineEditor } from './dj-line-editor'
 import type { PortariaSection } from './portaria-pdf'
-import { RegistryPage } from './registry'
-import { createContext, useContext, useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+const RegistryPage = lazy(() => import('./registry').then(module => ({ default: module.RegistryPage })))
+import { lazy, Suspense, createContext, useContext, useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useBlocker } from '@tanstack/react-router'
 import {
   Archive,
@@ -229,6 +229,7 @@ export function VerdantWorkspace({ sectionName }: { sectionName?: string }) {
           {translate(serverConnected ? 'Sincronização com servidor ativa' : 'Servidor desconectado · alterações indisponíveis')}
           {!ready && <span className='ms-2'>{<LocalizedText text={"· carregando"} />}</span>}
         </div>
+        <Suspense fallback={<p role='status' className='p-4'>Carregando página…</p>}>
         <PageDataState ready={ready} connected={serverConnected} retry={() => void refresh()}>
         {section === 'escalas' && <RostersPage data={data} />}
         {section === 'financeiro' && <FinancePage />}
@@ -240,6 +241,7 @@ export function VerdantWorkspace({ sectionName }: { sectionName?: string }) {
         {section === 'exportacoes' && <ExportsPage data={data} />}
         {section === 'configuracoes' && <SettingsPage data={data} />}
         </PageDataState>
+        </Suspense>
       </Main>
     </>
   )
@@ -2006,7 +2008,7 @@ function ReportExportCard({ icon, title, description, count, countLabel, onPrint
     <DialogContent className='verdant-report-dialog sm:max-w-5xl'>
       <DialogHeader><DialogTitle>{translate(title)}</DialogTitle><DialogDescription>{translate(description)}</DialogDescription></DialogHeader>
       {count !== undefined && <p className='text-sm text-muted-foreground'>{count} {translate(countLabel || '')}</p>}
-      {children && <div className='verdant-export-options'>{children}</div>}
+      {children && <div className='verdant-export-options'><Suspense fallback={<p role='status'>Carregando relatório…</p>}>{children}</Suspense></div>}
       {(onPrint || onCsv) && <div className='verdant-export-actions'>{onPrint && <Button className='verdant-report-primary' onClick={onPrint} disabled={disabled}><Printer size={15} /><LocalizedText text='Gerar PDF' leadingSpace /></Button>}{onCsv && <Button variant='outline' onClick={onCsv} disabled={disabled}><ArrowDownToLine size={15} /><LocalizedText text='Exportar CSV' leadingSpace /></Button>}</div>}
     </DialogContent>
   </Dialog>
