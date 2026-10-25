@@ -2,9 +2,13 @@ import { memo } from 'react'
 import { Link, useLocation } from '@tanstack/react-router'
 import { trackNavigation } from '@/lib/analytics'
 import { getBreadcrumbs, getNavigationPage } from '@/lib/navigation'
+import { operationContext } from '@/lib/operation-context'
 import { useLanguage } from '@/context/language-provider'
 
 export const PageContext = memo(function PageContext() {
+  const search = useLocation({
+    select: (location) => location.search as Record<string, unknown>,
+  })
   const pathname = useLocation({ select: (location) => location.pathname })
   const { translate } = useLanguage()
   const page = getNavigationPage(pathname)
@@ -29,6 +33,7 @@ export const PageContext = memo(function PageContext() {
               ) : (
                 <Link
                   to={item.path}
+                  search={operationContext(search, item.path)}
                   className='inline-flex min-h-11 items-center rounded-sm underline-offset-4 hover:underline'
                   onClick={() =>
                     trackNavigation('breadcrumb_click', pathname, {

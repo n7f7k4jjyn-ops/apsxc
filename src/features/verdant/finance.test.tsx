@@ -1,3 +1,9 @@
+import {
+  createRootRoute,
+  createRouter,
+  createMemoryHistory,
+  RouterProvider,
+} from '@tanstack/react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
 import { userEvent } from 'vitest/browser'
@@ -65,10 +71,20 @@ async function selectCsv(text: string) {
   input.dispatchEvent(new Event('change', { bubbles: true }))
 }
 
+async function renderFinance() {
+  const routeTree = createRootRoute({ component: FinancePage })
+  const router = createRouter({
+    routeTree,
+    history: createMemoryHistory({ initialEntries: ['/'] }),
+  })
+  await router.load()
+  return render(<RouterProvider router={router} />)
+}
+
 describe('FinancePage', () => {
   it('restricts non-admin users without fetching financial data', async () => {
     auth.role = ['manager']
-    const screen = await render(<FinancePage />)
+    const screen = await renderFinance()
     await expect
       .element(screen.getByText('Acesso restrito a administradores.'))
       .toBeInTheDocument()
@@ -80,7 +96,7 @@ describe('FinancePage', () => {
 
   it('does not show confirmed zero balances or enable mutations after load failure', async () => {
     fetchMock.mockResolvedValue(json({ error: 'Indisponível' }, 500))
-    const screen = await render(<FinancePage />)
+    const screen = await renderFinance()
     await expect
       .element(
         screen.getByText(
@@ -103,7 +119,7 @@ describe('FinancePage', () => {
     fetchMock.mockResolvedValue(
       json({ revision: 1, entries: [], beneficiaries: null, events: [] })
     )
-    const screen = await render(<FinancePage />)
+    const screen = await renderFinance()
     await expect
       .element(
         screen.getByText(
@@ -129,7 +145,7 @@ describe('FinancePage', () => {
         ],
       })
     )
-    const screen = await render(<FinancePage />)
+    const screen = await renderFinance()
     await expect
       .element(screen.getByText(/Relatório indisponível:/))
       .toBeInTheDocument()
@@ -145,13 +161,19 @@ describe('FinancePage', () => {
   })
 
   it('disables mutations and export for an invalid report period', async () => {
-    const screen = await render(<FinancePage />)
+    const screen = await renderFinance()
     await expect
       .element(screen.getByRole('button', { name: 'Novo lançamento' }))
       .toBeEnabled()
     await userEvent.click(screen.getByText(/^Período:/))
-    await userEvent.fill(screen.getByRole('textbox', { name: 'Data inicial' }), '2026-10-31')
-    await userEvent.fill(screen.getByRole('textbox', { name: 'Data final' }), '2026-10-01')
+    await userEvent.fill(
+      screen.getByRole('textbox', { name: 'Data inicial' }),
+      '2026-10-31'
+    )
+    await userEvent.fill(
+      screen.getByRole('textbox', { name: 'Data final' }),
+      '2026-10-01'
+    )
     await expect
       .element(screen.getByText(/Relatório indisponível:/))
       .toBeInTheDocument()
@@ -183,7 +205,7 @@ describe('FinancePage', () => {
       }
       return json({ ...latest, imported: 0, skipped: 1 })
     })
-    const screen = await render(<FinancePage />)
+    const screen = await renderFinance()
     await userEvent.click(
       screen.getByRole('button', { name: 'Novo lançamento' })
     )
@@ -244,7 +266,7 @@ describe('FinancePage', () => {
         skipped: 0,
       })
     })
-    const screen = await render(<FinancePage />)
+    const screen = await renderFinance()
     await userEvent.click(
       screen.getByRole('button', { name: 'Novo lançamento' })
     )
@@ -295,7 +317,7 @@ describe('FinancePage', () => {
       const body = JSON.parse(init.body as string)
       return json({ revision: 2, entries: [{ ...entry, ...body }] })
     })
-    const screen = await render(<FinancePage />)
+    const screen = await renderFinance()
     await userEvent.click(
       screen.getByRole('button', { name: 'Baixar Aluguel do espaço' })
     )
@@ -349,7 +371,7 @@ describe('FinancePage', () => {
       const body = JSON.parse(init.body as string)
       return json({ revision: 2, entries: [{ ...settled, ...body }] })
     })
-    const screen = await render(<FinancePage />)
+    const screen = await renderFinance()
     await userEvent.click(
       screen.getByRole('button', { name: 'Detalhes de Aluguel do espaço' })
     )
@@ -387,7 +409,7 @@ describe('FinancePage', () => {
       if (!init?.method) return json(data())
       return json({ revision: 2, entries: [entry], imported: 1, skipped: 0 })
     })
-    const screen = await render(<FinancePage />)
+    const screen = await renderFinance()
     await expect
       .element(screen.getByText(/pix-privado/))
       .not.toBeInTheDocument()
@@ -444,7 +466,7 @@ describe('FinancePage', () => {
         entries: [{ ...cancelled, ...JSON.parse(init.body as string) }],
       })
     })
-    const screen = await render(<FinancePage />)
+    const screen = await renderFinance()
     await userEvent.click(
       screen.getByRole('button', { name: 'Reabrir Aluguel do espaço' })
     )
@@ -486,7 +508,7 @@ describe('FinancePage', () => {
         entries: [{ ...historical, ...JSON.parse(init.body as string) }],
       })
     })
-    const screen = await render(<FinancePage />)
+    const screen = await renderFinance()
     await userEvent.click(
       screen.getByRole('button', { name: 'Detalhes de Aluguel do espaço' })
     )
@@ -544,13 +566,19 @@ describe('FinancePage', () => {
         ],
       })
     )
-    const screen = await render(<FinancePage />)
+    const screen = await renderFinance()
     await expect
       .element(screen.getByRole('button', { name: 'Novo lançamento' }))
       .toBeEnabled()
     await userEvent.click(screen.getByText(/^Período:/))
-    await userEvent.fill(screen.getByRole('textbox', { name: 'Data inicial' }), '2026-10-01')
-    await userEvent.fill(screen.getByRole('textbox', { name: 'Data final' }), '2026-10-31')
+    await userEvent.fill(
+      screen.getByRole('textbox', { name: 'Data inicial' }),
+      '2026-10-01'
+    )
+    await userEvent.fill(
+      screen.getByRole('textbox', { name: 'Data final' }),
+      '2026-10-31'
+    )
     await expect
       .element(
         screen.getByRole('button', { name: 'Detalhes de Aluguel do espaço' })
@@ -571,8 +599,12 @@ describe('FinancePage', () => {
       if (!init?.method) return json(data())
       return json({ revision: 2, entries: [entry], imported: 1, skipped: 0 })
     })
-    const screen = await render(<FinancePage />)
-    await userEvent.click(screen.getByText('Importar dados · Produção, equipe e financeiro', { exact: true }))
+    const screen = await renderFinance()
+    await userEvent.click(
+      screen.getByText('Importar dados · Produção, equipe e financeiro', {
+        exact: true,
+      })
+    )
     await expect
       .element(screen.getByRole('button', { name: 'Novo lançamento' }))
       .toBeEnabled()
@@ -601,7 +633,7 @@ describe('FinancePage', () => {
   })
 
   it('reports CSV line errors without changing or uploading the ledger', async () => {
-    const screen = await render(<FinancePage />)
+    const screen = await renderFinance()
     await expect
       .element(screen.getByRole('button', { name: 'Novo lançamento' }))
       .toBeEnabled()
@@ -644,8 +676,12 @@ describe('FinancePage', () => {
         ],
       })
     })
-    const screen = await render(<FinancePage />)
-    await userEvent.click(screen.getByText('Importar dados · Produção, equipe e financeiro', { exact: true }))
+    const screen = await renderFinance()
+    await userEvent.click(
+      screen.getByText('Importar dados · Produção, equipe e financeiro', {
+        exact: true,
+      })
+    )
     await expect
       .element(screen.getByRole('button', { name: 'Novo lançamento' }))
       .toBeEnabled()
@@ -685,7 +721,7 @@ describe('FinancePage', () => {
   })
 
   it('still rejects new imported rows referencing an unknown event', async () => {
-    const screen = await render(<FinancePage />)
+    const screen = await renderFinance()
     await expect
       .element(screen.getByRole('button', { name: 'Novo lançamento' }))
       .toBeEnabled()
@@ -708,7 +744,7 @@ describe('FinancePage', () => {
       gets++
       return json({ ...data(), revision: gets })
     })
-    const screen = await render(<FinancePage />)
+    const screen = await renderFinance()
     await userEvent.click(
       screen.getByRole('button', { name: 'Cancelar Aluguel do espaço' })
     )

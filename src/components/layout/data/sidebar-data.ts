@@ -1,20 +1,14 @@
 import {
-  Construction,
   LayoutDashboard,
   Monitor,
-  Bug,
   ListTodo,
-  FileX,
   HelpCircle,
-  Lock,
   Bell,
   Package,
   Palette,
-  ServerOff,
   Settings,
   Wrench,
   UserCog,
-  UserX,
   Users,
   MessagesSquare,
   AudioWaveform,
@@ -52,121 +46,87 @@ export const sidebarData: SidebarData = {
   ],
   navGroups: [
     {
-      title: 'Geral',
-      items: [
-        {
-          title: 'Resumo',
-          url: '/',
-          icon: LayoutDashboard,
-        },
-        {
-          title: 'Tarefas',
-          url: '/tasks',
-          icon: ListTodo,
-        },
-        {
-          title: 'Apps',
-          url: '/apps',
-          icon: Package,
-        },
-        { title: 'Conversas', url: '/chats', icon: MessagesSquare },
-        {
-          title: 'Acessos ao painel',
-          url: '/users',
-          icon: Users,
-        },
-      ],
+      title: 'Visão geral',
+      items: [{ title: 'Resumo', url: '/', icon: LayoutDashboard }],
     },
     {
-      title: 'Verdant · Operação',
+      title: 'Operação',
       items: [
-        { title: 'Agenda de eventos', url: '/verdant/agenda', icon: CalendarDays },
-        { title: 'Conteúdo', url: '/verdant/conteudo', icon: PanelsTopLeft },
-        { title: 'Escalas', url: '/verdant/escalas', icon: ClipboardList },
-        { title: 'Financeiro', url: '/verdant/financeiro', icon: Wallet },
-        { title: 'Formulários', url: '/verdant/formularios', icon: ClipboardList },
+        {
+          title: 'Agenda de eventos',
+          url: '/verdant/agenda',
+          icon: CalendarDays,
+        },
+        {
+          title: 'Formulários',
+          url: '/verdant/formularios',
+          icon: ClipboardList,
+        },
+        {
+          title: 'Inscrições',
+          url: '/verdant/inscricoes',
+          icon: ClipboardList,
+        },
         { title: 'Listas', url: '/verdant/listas', icon: ClipboardList },
-        { title: 'Inscrições', url: '/verdant/inscricoes', icon: ClipboardList },
-        { title: 'Relatórios', url: '/verdant/exportacoes', icon: ClipboardList },
-        { title: 'Cadastros', url: '/verdant/cadastros', icon: Users },
-        { title: 'Configurações Verdant', url: '/verdant/configuracoes', icon: Settings },
+        { title: 'Escalas', url: '/verdant/escalas', icon: ClipboardList },
       ],
     },
     {
-      title: 'Páginas',
+      title: 'Relacionamento',
+      items: [
+        { title: 'Cadastros', url: '/verdant/cadastros', icon: Users },
+        { title: 'Conversas', url: '/chats', icon: MessagesSquare },
+      ],
+    },
+    {
+      title: 'Marketing',
+      items: [
+        { title: 'Conteúdo', url: '/verdant/conteudo', icon: PanelsTopLeft },
+        { title: 'Tarefas', url: '/tasks', icon: ListTodo },
+      ],
+    },
+    {
+      title: 'Financeiro',
+      items: [
+        { title: 'Financeiro', url: '/verdant/financeiro', icon: Wallet },
+      ],
+    },
+    {
+      title: 'Relatórios',
       items: [
         {
-          title: 'Alertas',
-          icon: Bug,
-          items: [
-            {
-              title: 'Não autorizado',
-              url: '/errors/unauthorized',
-              icon: Lock,
-            },
-            {
-              title: 'Acesso negado',
-              url: '/errors/forbidden',
-              icon: UserX,
-            },
-            {
-              title: 'Página não encontrada',
-              url: '/errors/not-found',
-              icon: FileX,
-            },
-            {
-              title: 'Erro interno do servidor',
-              url: '/errors/internal-server-error',
-              icon: ServerOff,
-            },
-            {
-              title: 'Em manutenção',
-              url: '/errors/maintenance-error',
-              icon: Construction,
-            },
-          ],
+          title: 'Relatórios',
+          url: '/verdant/exportacoes',
+          icon: ClipboardList,
         },
       ],
     },
     {
-      title: 'Outros',
+      title: 'Administração',
       items: [
+        { title: 'Apps', url: '/apps', icon: Package },
+        { title: 'Acessos ao painel', url: '/users', icon: Users },
+        {
+          title: 'Configurações Verdant',
+          url: '/verdant/configuracoes',
+          icon: Settings,
+        },
         {
           title: 'Configurações',
           icon: Settings,
           items: [
-            {
-              title: 'Perfil',
-              url: '/settings',
-              icon: UserCog,
-            },
-            {
-              title: 'Conta',
-              url: '/settings/account',
-              icon: Wrench,
-            },
-            {
-              title: 'Aparência',
-              url: '/settings/appearance',
-              icon: Palette,
-            },
+            { title: 'Perfil', url: '/settings', icon: UserCog },
+            { title: 'Conta', url: '/settings/account', icon: Wrench },
+            { title: 'Aparência', url: '/settings/appearance', icon: Palette },
             {
               title: 'Notificações',
               url: '/settings/notifications',
               icon: Bell,
             },
-            {
-              title: 'Exibição',
-              url: '/settings/display',
-              icon: Monitor,
-            },
+            { title: 'Exibição', url: '/settings/display', icon: Monitor },
           ],
         },
-        {
-          title: 'Central de ajuda',
-          url: '/help-center',
-          icon: HelpCircle,
-        },
+        { title: 'Central de ajuda', url: '/help-center', icon: HelpCircle },
       ],
     },
   ],

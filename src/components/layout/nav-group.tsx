@@ -3,6 +3,7 @@ import { Link, useLocation } from '@tanstack/react-router'
 import { ChevronRight } from 'lucide-react'
 import { trackNavigation } from '@/lib/analytics'
 import { isNavigationActive } from '@/lib/navigation'
+import { operationContext } from '@/lib/operation-context'
 import {
   Collapsible,
   CollapsibleContent,
@@ -65,6 +66,9 @@ function NavBadge({ children }: { children: ReactNode }) {
 }
 
 function SidebarMenuLink({ item, href }: { item: NavLink; href: string }) {
+  const search = useLocation({
+    select: (location) => location.search as Record<string, unknown>,
+  })
   const { setOpenMobile } = useSidebar()
   return (
     <SidebarMenuItem>
@@ -74,7 +78,8 @@ function SidebarMenuLink({ item, href }: { item: NavLink; href: string }) {
         tooltip={item.title}
       >
         <Link
-          to={item.url}
+          to={String(item.url)}
+          search={() => operationContext(search, String(item.url))}
           aria-current={checkIsActive(href, item) ? 'page' : undefined}
           onClick={() => {
             trackNavigation('menu_click', href, {
@@ -99,6 +104,9 @@ function SidebarMenuCollapsible({
   item: NavCollapsible
   href: string
 }) {
+  const search = useLocation({
+    select: (location) => location.search as Record<string, unknown>,
+  })
   const { setOpenMobile } = useSidebar()
   return (
     <Collapsible
@@ -127,7 +135,8 @@ function SidebarMenuCollapsible({
                   isActive={checkIsActive(href, subItem)}
                 >
                   <Link
-                    to={subItem.url}
+                    to={String(subItem.url)}
+                    search={() => operationContext(search, String(subItem.url))}
                     aria-current={
                       checkIsActive(href, subItem) ? 'page' : undefined
                     }
@@ -159,6 +168,9 @@ function SidebarMenuCollapsedDropdown({
   item: NavCollapsible
   href: string
 }) {
+  const search = useLocation({
+    select: (location) => location.search as Record<string, unknown>,
+  })
   return (
     <SidebarMenuItem>
       <DropdownMenu>
@@ -181,7 +193,8 @@ function SidebarMenuCollapsedDropdown({
           {item.items.map((sub) => (
             <DropdownMenuItem key={`${sub.title}-${sub.url}`} asChild>
               <Link
-                to={sub.url}
+                to={String(sub.url)}
+                search={() => operationContext(search, String(sub.url))}
                 aria-current={checkIsActive(href, sub) ? 'page' : undefined}
                 onClick={() =>
                   trackNavigation('menu_click', href, {

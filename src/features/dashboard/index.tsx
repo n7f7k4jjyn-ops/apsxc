@@ -1,3 +1,4 @@
+import { useOperationMonth } from '@/features/verdant/use-operation-month'
 import {
   lazy,
   Suspense,
@@ -39,6 +40,7 @@ import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { formatDate, type FormKey } from '@/features/verdant/data'
+import { useOperationFilter } from '@/features/verdant/use-operation-filter'
 import { eventOptions } from '@/features/verdant/event-options'
 import { MonthFilter } from '@/features/verdant/month-filter'
 import { monthRange } from '@/features/verdant/month-range'
@@ -98,12 +100,11 @@ export function Dashboard() {
     return () => window.clearInterval(timer)
   }, [])
   const [period, setPeriod] = useState<Period>('week')
-  const [focusId, setFocusId] = useState('all')
-  const [customRange, setCustomRange] = useState<DateRange>({
-    from: '',
-    to: '',
-  })
-  const [rangeActive, setRangeActive] = useState(false)
+  const [eventFilter, setFocusId] = useOperationFilter('event', 'all')
+  const focusId = eventFilter || 'all'
+  const [selectedMonth, setSelectedMonth] = useOperationMonth()
+  const [customRange, setCustomRange] = useState<DateRange>(() => monthRange(selectedMonth))
+  const [rangeActive, setRangeActive] = useState(Boolean(selectedMonth))
   let rangeError = ''
   if (rangeActive) {
     try {
@@ -189,13 +190,13 @@ export function Dashboard() {
                 : ''
             }
             onChange={(value) => {
+              setSelectedMonth(value)
               if (!value) {
                 setRangeActive(false)
                 return
               }
               setCustomRange(monthRange(value))
               setRangeActive(true)
-              setFocusId('all')
             }}
           />
           <div>
