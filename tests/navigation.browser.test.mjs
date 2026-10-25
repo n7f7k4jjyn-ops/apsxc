@@ -350,6 +350,7 @@ test('event workflow and touch navigation across desktop, tablet and mobile', { 
     await page.route('**/api/finance', route => route.fulfill({ json: { events: [{ id: event.id, date: event.date, name: 'EventoComNomeMuitoLongoSemEspaçosParaConferirQuebraDeTexto • Festa de teste no relatório' }], beneficiaries: [{ id: 'influencer:qa-person', name: 'InfluencerComNomeMuitoLongoSemEspaçosParaConferirLegibilidade' }], entries: [] } }))
     await page.route('**/api/finance/influencer-admissions', route => route.fulfill({ json: { registrations: [{ id: 'qa-reg', eventId: event.id, influencerId: 'qa-person' }], admissions: [] } }))
     await page.goto(`${base}/verdant/exportacoes?event=${event.id}`)
+    await page.getByLabel('Mês', { exact: true }).fill('2026-10')
     await page.getByRole('button', { name: 'Abrir Influencers', exact: true }).click()
     const influencerDialog = page.getByRole('dialog', { name: 'Influencers', exact: true })
     await influencerDialog.getByRole('button', { name: 'Gerar relatório de repasse de influencers', exact: true }).click()
