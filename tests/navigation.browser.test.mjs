@@ -277,16 +277,36 @@ test('event workflow and touch navigation across desktop, tablet and mobile', { 
       await page.setViewportSize({ width, height: 900 })
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `Summary must fit ${width}px`)
       if (width === 390 || width === 1440) await capture(`resumo-${width}`)
+      for (const title of ['Vagas e equipe', 'Últimas inscrições']) {
+        const trigger = page.getByRole('button', { name: `Ver ${title.toLocaleLowerCase('pt-BR')}`, exact: true })
+        await trigger.click()
+        const dialog = page.getByRole('dialog', { name: title, exact: true })
+        await expect(dialog).toBeVisible()
+        assert.equal(await dialog.evaluate(element => element.scrollWidth > element.clientWidth + 1), false, `${title} dialog must fit ${width}px`)
+        await dialog.getByRole('button', { name: 'Fechar', exact: true }).click()
+        await expect(trigger).toBeFocused()
+      }
+
       for (const value of await page.locator('[data-fit-value]').all()) {
         assert.ok(await value.evaluate(element => element.scrollWidth <= element.clientWidth + 1), 'Full numbers must fit their cards')
       }
     }
     await page.getByRole('button', { name: 'Resumo financeiro', exact: true }).click()
-    await expect(page.getByRole('heading', { name: 'Comparação entre períodos' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Ver comparação entre períodos', exact: true })).toBeVisible()
     for (const width of [320, 390, 768, 1440]) {
       await page.setViewportSize({ width, height: 900 })
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `Financial summary must fit ${width}px`)
       if (width === 390 || width === 1440) await capture(`financeiro-${width}`)
+      await expect(page.getByRole('region', { name: 'Indicadores financeiros' }).locator('[data-fit-value]')).toHaveCount(4)
+      for (const title of ['Saldos e pendências', 'Pagamentos por categoria', 'Público e listas', 'Comparação entre períodos', 'Conferência Zig']) {
+        await page.getByRole('button', { name: `Ver ${title.toLocaleLowerCase('pt-BR')}`, exact: true }).click()
+        const dialog = page.getByRole('dialog', { name: title, exact: true })
+        await expect(dialog).toBeVisible()
+        assert.equal(await dialog.evaluate(element => element.scrollWidth > element.clientWidth + 1), false, `${title} dialog must fit ${width}px`)
+        if (title === 'Comparação entre períodos') await expect(dialog.getByRole('table')).toBeVisible()
+        await dialog.getByRole('button', { name: 'Fechar', exact: true }).click()
+      }
+
     }
     await page.goto(`${base}/verdant/conteudo`)
     await page.getByLabel('Mês', { exact: true }).fill('2026-09')
