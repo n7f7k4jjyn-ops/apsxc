@@ -1,3 +1,4 @@
+import { MonthFilter } from './month-filter'
 import { useEffect, useRef, useState } from 'react'
 import { useAuthStore } from '@/stores/auth-store'
 import { Button } from '@/components/ui/button'
@@ -37,9 +38,11 @@ async function api(url: string, init?: RequestInit) {
 export function RostersPage({
   data,
   historyOnly = false,
+  monthFilter,
 }: {
   data: VerdantState
   historyOnly?: boolean
+  monthFilter?: string
 }) {
   const admin = useAuthStore((s) => s.auth.user?.role.includes('admin'))
   const [rosters, setRosters] = useState<Roster[]>([]),
@@ -66,6 +69,8 @@ export function RostersPage({
       active = false
     }
   }, [admin])
+  const [localMonth, setLocalMonth] = useState('')
+  const month = monthFilter ?? localMonth
   const [selectedDate, setSelectedDate] = useState('')
   const [search, setSearch] = useState(''),
     [availabilityFilter, setAvailabilityFilter] = useState(''),
@@ -234,6 +239,7 @@ export function RostersPage({
 
   const shown = rosters.filter(
     (row) =>
+      (!month || row.date.startsWith(month)) &&
       (!filter || row.kind === filter) &&
       (!eventFilter || row.eventId === eventFilter)
   )
@@ -291,6 +297,7 @@ export function RostersPage({
       {!draft && (
         <>
           <div className='roster-toolbar'>
+            {monthFilter === undefined && <MonthFilter value={month} onChange={value => { setLocalMonth(value); setEventFilter(''); setSelectedDate('') }} />}
             <label>
               Tipo
               <select
@@ -324,6 +331,8 @@ export function RostersPage({
           </div>
           {!loading && (
             <RosterCalendar
+              month={month}
+              onMonthChange={monthFilter === undefined ? value => { setLocalMonth(value); setSelectedDate('') } : undefined}
               rows={shown}
               selected={selectedDate}
               onSelect={setSelectedDate}

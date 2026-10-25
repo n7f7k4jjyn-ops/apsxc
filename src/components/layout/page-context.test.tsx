@@ -73,26 +73,12 @@ describe('page navigation context', () => {
       .not.toHaveAttribute('aria-current')
   })
 
-  it('offers a touch-sized mobile selector and allows returning to the parent section', async () => {
+  it('leaves mobile navigation to the bottom bar without duplicating the desktop shortcuts', async () => {
     await page.viewport(320, 700)
     try {
       const screen = await render(<AppQuickNav />)
-      const select = screen.getByRole('combobox', { name: 'Ir para página' })
-      await expect.element(select).toHaveValue('')
-      await expect
-        .element(screen.getByRole('option', { name: 'DJs', exact: true }))
-        .toBeDisabled()
-      expect(
-        select.element().getBoundingClientRect().height
-      ).toBeGreaterThanOrEqual(44)
-      expect(
-        select.element().getBoundingClientRect().width
-      ).toBeLessThanOrEqual(320)
-      await expect
-        .element(screen.getByRole('option', { name: 'Financeiro' }))
-        .not.toBeInTheDocument()
-      await userEvent.selectOptions(select, '/verdant/cadastros')
-      expect(navigate).toHaveBeenCalledWith({ to: '/verdant/cadastros' })
+      await expect.element(screen.getByRole('combobox')).not.toBeInTheDocument()
+      await expect.element(screen.getByRole('link', { name: 'Cadastros' })).not.toBeInTheDocument()
     } finally {
       await page.viewport(1280, 720)
     }

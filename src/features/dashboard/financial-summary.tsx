@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { FitValue } from '@/components/fit-value'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from '@tanstack/react-router'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
@@ -70,7 +71,7 @@ export function FinancialSummary({
       })
     return () => controller.abort()
   }, [refresh])
-  const result = useMemo(() => {
+  const result = (() => {
     if (!data || busy || !connected || (focusId !== 'all' && !eventId))
       return null
     try {
@@ -81,7 +82,7 @@ export function FinancialSummary({
     } catch (e) {
       return { report: null, error: (e as Error).message }
     }
-  }, [data, busy, connected, focusId, from, to, eventId])
+  })()
   const report = result?.report
   const previousTo = new Date(Date.parse(from + 'T12:00:00Z') - 86400000)
     .toISOString()
@@ -126,8 +127,7 @@ export function FinancialSummary({
       <Header fixed>
         <h1 className='text-lg font-semibold'>Resumo financeiro</h1>
       </Header>
-      <Main className='space-y-4'>
-        {summarySwitch}
+      <Main className='verdant-summary space-y-4'>
         <div className='flex flex-wrap items-center justify-between gap-3'>
           <div>
             <h2 className='text-2xl font-bold'>Resumo financeiro</h2>
@@ -147,6 +147,7 @@ export function FinancialSummary({
             Atualizar financeiro
           </Button>
         </div>
+        {summarySwitch}
         <p className='text-sm text-muted-foreground'>
           Recebimentos e pagamentos usam a data da baixa. Contas pendentes usam
           o vencimento. Evento e período são os mesmos do resumo da operação.
@@ -179,7 +180,7 @@ export function FinancialSummary({
                 </CardTitle>
               </CardHeader>
               <CardContent className='text-2xl font-semibold'>
-                {workflow.registrations.length}
+                <FitValue value={workflow.registrations.length.toLocaleString('pt-BR')} maxSize={28} />
               </CardContent>
             </Card>
             <Card>
@@ -187,7 +188,7 @@ export function FinancialSummary({
                 <CardTitle>Inscrições recebidas no período</CardTitle>
               </CardHeader>
               <CardContent className='text-2xl font-semibold'>
-                {workflow.received}
+                <FitValue value={workflow.received.toLocaleString('pt-BR')} maxSize={28} />
               </CardContent>
             </Card>
           </div>
@@ -199,7 +200,7 @@ export function FinancialSummary({
                 <CardTitle className='text-sm'>{label}</CardTitle>
               </CardHeader>
               <CardContent className='text-2xl font-bold'>
-                {formatCents(value)}
+                <FitValue value={formatCents(value)} maxSize={28} />
               </CardContent>
             </Card>
           ))}

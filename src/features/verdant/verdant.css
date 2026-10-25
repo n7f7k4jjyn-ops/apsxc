@@ -558,3 +558,7 @@
 .verdant-form-dialog .verdant-form-group-body { padding: 0; }
 .verdant-form-dialog .verdant-public-url { min-width: 0; overflow-wrap: anywhere; white-space: normal; }
 .verdant-form-dialog .verdant-form-group-actions { flex-wrap: wrap; }
+
+.verdant-column-filter-bar { align-items: flex-end; }
+.verdant-column-filter-bar > .verdant-month-filter { flex: 0 1 200px; }
+@media(max-width:767px) { .verdant-column-filter-bar > .verdant-month-filter { flex-basis: 100%; } }

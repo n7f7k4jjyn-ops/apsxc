@@ -13,6 +13,7 @@ const steps = [
 
 export function EventWorkflowNav({ event }: { event?: VerdantEvent }) {
   const pathname = useLocation({ select: (location) => location.pathname })
+  const month = useLocation({ select: location => (location.search as Record<string, unknown>).month })
   const { translate } = useLanguage()
   if (!event) return null
 
@@ -34,7 +35,7 @@ export function EventWorkflowNav({ event }: { event?: VerdantEvent }) {
             <Button key={step.path} asChild variant='outline' size='sm'>
               <Link
                 to={step.path}
-                search={{ event: event.id }}
+                search={{ event: event.id, ...(typeof month === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(month) ? { month } : {}) }}
                 onClick={() =>
                   trackNavigation('menu_click', pathname, {
                     destination: step.path,

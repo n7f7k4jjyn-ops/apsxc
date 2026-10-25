@@ -1,3 +1,4 @@
+import { MobileBottomNav } from './mobile-bottom-nav'
 import { useEffect } from 'react'
 import { Outlet, useLocation, useRouter } from '@tanstack/react-router'
 import { getCookie } from '@/lib/cookies'
@@ -70,6 +71,7 @@ export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
           >
             {children ?? <Outlet />}
           </SidebarInset>
+          <MobileBottomNav />
         </SidebarProvider>
       </LayoutProvider>
     </SearchProvider>

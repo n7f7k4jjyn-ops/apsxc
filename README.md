@@ -30,7 +30,7 @@ O servidor escuta a porta `PORT` (padrão `3000`) e serve os arquivos compilados
 - Novas URLs devem seguir o idioma do domínio: `/recurso`, `/recurso/:id`, `/recurso/novo` e `/recurso/:id/editar`. Cadastros que já usam modais continuam usando modais. As URLs atuais, inclusive públicas (`/lista/:slug`, `/lovers`, `/equipe`, `/trabalhe-conosco`), foram preservadas. `/verdant/respostas` redireciona para `/verdant/inscricoes`, mantendo filtros e fragmentos; nenhum dado precisa ser migrado.
 - Páginas privadas ficam sob `_authenticated`, cujo `beforeLoad` chama `requireSession`. Uma sessão expirada retorna ao login com o destino original; falhas de rede mostram erro com nova tentativa, sem simular logout. O retorno após login aceita apenas destinos internos. Rotas Clerk mantêm sua proteção independente.
 - O layout compartilhado oferece título, breadcrumbs, menu ativo e link para saltar ao conteúdo. O drawer móvel usa foco contido, restauração de foco e Esc do Radix; fecha ao navegar. Preserve landmarks, nomes acessíveis, `aria-current`, foco visível e alvos de toque de pelo menos 44 px ao adicionar controles.
-- Em telas abaixo de 768 px, os atalhos do cabeçalho usam um seletor nativo com a página atual indicada; em páginas filhas como DJs, o atalho para Cadastros continua selecionável. Os breadcrumbs ficam disponíveis no desktop. Isso evita uma faixa longa de links com rolagem lateral e libera espaço para o conteúdo no celular.
+- Em telas abaixo de 768 px, a barra inferior oferece Início, Agenda, Inscrições, Relatórios e Mais; Mais abre o menu lateral existente, preservando as permissões. Os atalhos do cabeçalho e breadcrumbs ficam no desktop, sem duplicar a navegação no celular. Há espaço reservado para a barra e a área segura do dispositivo.
 - Na agenda, o editor de um evento oferece atalhos para suas listas, inscrições e relatórios. Essas telas também oferecem continuidade entre si, mantendo `?event=...`. Os filtros de evento/lista das inscrições e o evento dos relatórios são sincronizados com a URL sem recarregar a página, saltar a rolagem ou acrescentar uma entrada ao histórico a cada alteração. Relatórios embutidos no resumo mantêm sua seleção local.
 - Em inscrições, a busca por nome/contato fica visível; profissional, período e consentimento ficam em **Mais filtros**, com contagem dos filtros secundários ativos. **Limpar filtros** também limpa evento/lista da URL. Contagens de resultados são anunciadas por leitores de tela; nenhum consentimento ou regra de exportação foi alterado.
 - `PageLoading`, `PageError`, `PageDataState` e `EmptyEvents` em `src/components/page-state.tsx` oferecem padrões reutilizáveis. O workspace operacional mostra skeleton durante a carga e um painel de erro com retry em caso de desconexão. Editores já carregados permanecem montados para preservar rascunhos; as gravações do estado operacional continuam bloqueadas pelo store enquanto desconectado. Feedbacks de gravação existentes continuam usando notificações.
@@ -50,6 +50,12 @@ Eventos: `page_view`, `menu_click`, `breadcrumb_click`, `cta_click` (ações de 
 
 Verificação focada: `npm test -- src/lib/navigation.test.ts src/lib/auth-guard.test.ts src/lib/analytics.test.ts src/components/layout/page-context.test.tsx src/features/auth/sign-in/components/user-auth-form.test.tsx`. Antes da primeira execução, instale o navegador com `npm run test:browser:install`.
 
+### Cards, período e valores
+
+- Relatórios, Formulários e Apps usam cards compactos com diálogos acessíveis para detalhes e configurações. O fechamento de editores confirma o descarte de rascunhos; as configurações administrativas e ferramentas Zig mantêm suas permissões.
+- Mês pode ser escolhido sem evento em Listas, Inscrições e Relatórios. Os relatórios mensais agrupam datas/eventos e exportam PDF/CSV do período; a seleção explícita de mês permite consultar também o histórico. Mês e evento são preservados na URL e nos atalhos contextuais. Financeiro traduz o mês para primeiro/último dia; Agenda, Escalas e Conteúdo permitem saltar diretamente para o mês desejado.
+- Resumo organiza título, filtros compartilhados, indicadores, atalhos, próximos eventos, prioridades e atividade. As contagens e valores financeiros ajustam a fonte à largura do card, mantendo o valor completo e os centavos. Comparações tabulares continuam disponíveis em áreas com rolagem própria.
+
 ### Revisão do fluxo e QA responsivo
 
 O diagnóstico priorizou o percurso **Resumo → Agenda → Listas → Inscrições → Relatórios**. As fricções tratadas foram o excesso de cabeçalho no celular, a perda do evento entre telas, links internos com recarga/redirecionamento, busca escondida entre filtros e controles operacionais de 42 px. Rotas públicas, permissões, persistência e regras financeiras permanecem inalteradas.
@@ -68,7 +74,7 @@ Roteiro manual de revisão:
 
 - No desktop, abrir um evento na agenda e seguir para listas, inscrições e relatórios: conferir o mesmo evento, título da página e seção ativa.
 - Nas inscrições, buscar um contato, abrir **Mais filtros**, combinar evento/lista e limpar os filtros; conferir contagem, estado vazio e URL. Recarregar um link filtrado e usar voltar/avançar do navegador.
-- No celular, alternar páginas pelo seletor do cabeçalho; abrir o menu lateral, navegar e conferir seu fechamento. Verificar campos, botões, cards de listas e relatórios sem cortes ou rolagem horizontal nas larguras acima.
+- No celular, alternar páginas pela barra inferior e abrir Mais; abrir o menu lateral, navegar e conferir seu fechamento. Verificar campos, botões, cards de listas e relatórios sem cortes ou rolagem horizontal nas larguras acima.
 - Usar Tab/Enter/Esc para navegar e conferir foco visível; testar também uma conta sem papel de administrador, que não deve receber atalhos de escalas/financeiro.
 - Simular conexão indisponível e conferir os estados existentes de erro/nova tentativa; reconectar sem perder rascunhos já abertos.
 

@@ -13,7 +13,7 @@ import { chromium, expect } from 'playwright/test'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
-test('event workflow and touch navigation across desktop, tablet and mobile', { timeout: 120000 }, async () => {
+test('event workflow and touch navigation across desktop, tablet and mobile', { timeout: 180000 }, async () => {
   const listener = createServer()
   await new Promise((resolve) => listener.listen(0, '127.0.0.1', resolve))
   const port = listener.address().port
@@ -36,12 +36,13 @@ test('event workflow and touch navigation across desktop, tablet and mobile', { 
   const data = JSON.parse(await readFile(path.join(root, 'src/features/verdant/seed.json'), 'utf8'))
   data.version = 7
   const [event, other] = data.events
+  other.date = '2026-09-10'
   data.registrations = [event, other].map((item, index) => ({
     id: `registration-${index}`,
     eventId: item.id,
     eventName: item.name,
     eventDate: item.date,
-    formKey: 'LISTA_LOVERS',
+    formKey: index === 0 ? 'ENTRADA_GRATUITA' : 'LISTA_LOVERS',
     name: `Pessoa de teste ${index}`,
     whatsapp: '',
     email: '',
@@ -134,21 +135,21 @@ test('event workflow and touch navigation across desktop, tablet and mobile', { 
         await expect(page.locator('main h1').first()).toBeVisible()
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `${route} must fit ${width}px`)
         if (width < 768) {
-          const selector = page.getByRole('combobox', { name: 'Ir para página' })
-          await expect(selector).toBeVisible()
-          assert.ok((await selector.boundingBox()).height >= 44)
-          assert.ok((await page.locator('header[data-app-header]').boundingBox()).height < 190)
+          const bottom = page.getByRole('navigation', { name: 'Navegação mobile' })
+          await expect(bottom).toBeVisible()
+          assert.ok((await bottom.boundingBox()).height >= 56)
+          assert.ok((await page.locator('header[data-app-header]').boundingBox()).height < 140)
           for (const control of await page.locator('main [data-slot="button"]:visible, main .verdant-column-filter-trigger:visible, main .verdant-calendar-day:visible').all()) {
             assert.ok((await control.boundingBox()).height >= 44, `Touch target: ${await control.textContent()}`)
           }
         } else {
-          await expect(page.getByRole('combobox', { name: 'Ir para página' })).toBeHidden()
+          await expect(page.getByRole('navigation', { name: 'Navegação mobile' })).toBeHidden()
         }
       }
     }
     await page.goto(`${base}/verdant/formularios`)
     const formCards = page.locator('.verdant-form-card-grid .verdant-export-card')
-    assert.equal(await formCards.count(), 8)
+    await expect(formCards).toHaveCount(8)
     for (const width of [390, 1280]) {
       await page.setViewportSize({ width, height: 900 })
       for (let i = 0; i < await formCards.count(); i++) {
@@ -189,16 +190,118 @@ test('event workflow and touch navigation across desktop, tablet and mobile', { 
     await page.keyboard.press('Escape')
     await expect(page.getByRole('dialog')).toHaveCount(1)
     await page.getByRole('dialog').getByRole('button', { name: 'Fechar', exact: true }).click()
+    // Selecting a month alone must include only events of that month, not submission dates.
+    await page.goto(`${base}/verdant/inscricoes`)
+    await page.getByLabel('Mês', { exact: true }).fill('2026-09')
+    await expect(page.getByRole('status').filter({ hasText: 'inscrição(ões)' })).toContainText('1 inscrição(ões)')
+    await expect(page.getByText('Pessoa de teste 1', { exact: true })).toBeVisible()
+    await page.getByLabel('Mês', { exact: true }).fill('2026-10')
+    await expect(page.getByText('Pessoa de teste 0', { exact: true })).toBeVisible()
+    await expect(page.getByText('Pessoa de teste 1', { exact: true })).toHaveCount(0)
+    await page.getByRole('button', { name: 'Limpar mês', exact: true }).click()
+    await expect(page.getByRole('status').filter({ hasText: 'inscrição(ões)' })).toContainText('2 inscrição(ões)')
+    await page.goto(`${base}/verdant/listas`)
+    await page.getByLabel('Mês', { exact: true }).fill('2026-09')
+    await expect.poll(() => page.locator('tbody tr').count()).toBeGreaterThan(0)
+    for (const cell of await page.locator('tbody tr td:first-child').all()) assert.ok((await cell.textContent()).includes('/09/2026'))
+    await page.goto(`${base}/verdant/exportacoes`)
+    await page.getByLabel('Mês', { exact: true }).fill('2026-09')
+    await expect(page.getByRole('combobox', { name: 'Evento dos relatórios', exact: true })).toHaveValue('')
+    await page.getByRole('button', { name: 'Abrir Lista geral · 2026-09', exact: true }).click()
+    const monthlyDialog = page.getByRole('dialog', { name: 'Lista geral · 2026-09', exact: true })
+    const csvDownload = page.waitForEvent('download')
+    await monthlyDialog.getByRole('button', { name: 'Exportar CSV', exact: true }).click()
+    const csv = await readFile(await (await csvDownload).path(), 'utf8')
+    assert.ok(csv.includes('Pessoa de teste 1'))
+    assert.ok(!csv.includes('Pessoa de teste 0'))
+    await monthlyDialog.getByRole('button', { name: 'Fechar', exact: true }).click()
+    await page.getByRole('button', { name: 'Abrir Lista de portaria', exact: true }).click()
+    const monthlyPdf = page.waitForEvent('download')
+    await page.getByRole('dialog').getByRole('button', { name: 'Gerar PDF', exact: true }).click()
+    const pdfFile = await monthlyPdf
+    assert.ok(pdfFile.suggestedFilename().includes('2026-09'))
+    assert.equal((await readFile(await pdfFile.path())).subarray(0, 4).toString(), '%PDF')
+    await page.getByRole('dialog').getByRole('button', { name: 'Fechar', exact: true }).click()
+    await page.getByLabel('Mês', { exact: true }).fill('2026-10')
+    await page.getByRole('button', { name: 'Abrir Lista de portaria', exact: true }).click()
+    const freeCsvDownload = page.waitForEvent('download')
+    await page.getByRole('dialog').getByRole('button', { name: 'Exportar CSV', exact: true }).click()
+    const freeCsv = await readFile(await (await freeCsvDownload).path(), 'utf8')
+    assert.ok(freeCsv.includes('LISTA FREE') && freeCsv.includes('Pessoa de teste 0'), 'Free entries must be included in the door report')
+    await page.getByRole('dialog').getByRole('button', { name: 'Fechar', exact: true }).click()
+    await page.goto(`${base}/verdant/financeiro`)
+    await page.locator('.finance-period-details > summary').first().click()
+    await page.getByLabel('Mês', { exact: true }).fill('2024-02')
+    await expect(page.getByLabel('Data inicial', { exact: true })).toHaveValue('2024-02-01')
+    await expect(page.getByLabel('Data final', { exact: true })).toHaveValue('2024-02-29')
+    await page.goto(`${base}/verdant/escalas`)
+    await page.getByLabel('Mês', { exact: true }).fill('2026-09')
+    await expect(page.getByRole('region', { name: 'Calendário de escalas' })).toContainText('setembro de 2026')
+    await page.goto(`${base}/apps`)
+    await page.getByRole('button', { name: 'Configurar Gmail', exact: true }).click()
+    const gmailDialog = page.getByRole('dialog', { name: 'Gmail', exact: true })
+    const gmailField = gmailDialog.getByLabel('Gmail: e-mail de contato', { exact: true })
+    await expect(gmailField).toBeVisible()
+    const previousEmail = await gmailField.inputValue()
+    await gmailField.fill('rascunho@example.com')
+    const rejectAppClose = page.waitForEvent('dialog')
+    const closeAppAttempt = gmailDialog.getByRole('button', { name: 'Fechar', exact: true }).click()
+    await (await rejectAppClose).dismiss()
+    await closeAppAttempt
+    await expect(gmailField).toHaveValue('rascunho@example.com')
+    const acceptAppClose = page.waitForEvent('dialog')
+    const discardApp = gmailDialog.getByRole('button', { name: 'Fechar', exact: true }).click()
+    await (await acceptAppClose).accept()
+    await discardApp
+    await page.getByRole('button', { name: 'Configurar Gmail', exact: true }).click()
+    await expect(page.getByRole('dialog', { name: 'Gmail', exact: true }).getByLabel('Gmail: e-mail de contato', { exact: true })).toHaveValue(previousEmail)
+    await page.getByRole('dialog', { name: 'Gmail', exact: true }).getByRole('button', { name: 'Fechar', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Abrir Zig', exact: true })).toHaveCount(0)
+    await page.goto(base)
+    await expect(page.getByRole('region', { name: 'Indicadores da operação' })).toBeVisible()
+    await page.getByLabel('Mês', { exact: true }).fill('2026-09')
+    await page.getByText('Personalizar período', { exact: true }).click()
+    await expect(page.getByLabel('Data inicial', { exact: true })).toHaveValue('2026-09-01')
+    await expect(page.getByLabel('Data final', { exact: true })).toHaveValue('2026-09-30')
+    for (const width of [320, 390, 768, 1440]) {
+      await page.setViewportSize({ width, height: 900 })
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `Summary must fit ${width}px`)
+      for (const value of await page.locator('[data-fit-value]').all()) {
+        assert.ok(await value.evaluate(element => element.scrollWidth <= element.clientWidth + 1), 'Full numbers must fit their cards')
+      }
+    }
+    await page.getByRole('button', { name: 'Resumo financeiro', exact: true }).click()
+    await expect(page.getByRole('heading', { name: 'Comparação entre períodos' })).toBeVisible()
+    for (const width of [320, 390, 768, 1440]) {
+      await page.setViewportSize({ width, height: 900 })
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `Financial summary must fit ${width}px`)
+    }
+    await page.goto(`${base}/verdant/conteudo`)
+    await page.getByLabel('Mês', { exact: true }).fill('2026-09')
+    await expect(page.getByText(/^setembro de 2026$/i)).toBeVisible()
+    for (const width of [320, 390, 768, 1440]) {
+      await page.setViewportSize({ width, height: 900 })
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `Content calendar must fit ${width}px`)
+    }
+    await page.goto(`${base}/apps`)
+    for (const name of ['Meta Pixel', 'WhatsApp', 'Gmail', 'Telegram']) {
+      await page.getByRole('button', { name: `Configurar ${name}`, exact: true }).click()
+      const dialog = page.getByRole('dialog', { name, exact: true })
+      await expect(dialog).toBeVisible()
+      await dialog.getByRole('button', { name: 'Fechar', exact: true }).click()
+    }
     await page.goto(`${base}/verdant/exportacoes?event=${event.id}`)
     await page.setViewportSize({ width: 375, height: 812 })
-    await page.getByRole('combobox', { name: 'Ir para página' }).selectOption('/verdant/listas')
+    const bottom = page.getByRole('navigation', { name: 'Navegação mobile' })
+    await bottom.getByRole('button', { name: 'Mais', exact: true }).click()
+    await page.getByRole('dialog', { name: 'Menu lateral' }).getByRole('link', { name: 'Listas', exact: true }).click()
     await expect(page).toHaveURL(`${base}/verdant/listas`)
-    await page.getByRole('button', { name: 'Alternar menu lateral' }).click()
+    await bottom.getByRole('button', { name: 'Mais', exact: true }).click()
     await expect(page.getByRole('dialog', { name: 'Menu lateral' })).toBeVisible()
     await page.getByRole('dialog').getByRole('link', { name: 'Inscrições', exact: true }).click()
     await expect(page.getByRole('dialog', { name: 'Menu lateral' })).toBeHidden()
     await expect(page).toHaveURL(`${base}/verdant/inscricoes`)
-    await page.getByRole('combobox', { name: 'Ir para página' }).selectOption('/verdant/agenda')
+    await bottom.getByRole('link', { name: 'Agenda', exact: true }).click()
     await page.getByRole('gridcell', { name: /^9, / }).click()
     await page.getByRole('button', { name: new RegExp(event.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) }).click()
     const editor = page.getByRole('dialog', { name: 'Editar evento' })
@@ -218,7 +321,8 @@ test('event workflow and touch navigation across desktop, tablet and mobile', { 
     await expect(page).toHaveURL(`${base}/verdant/listas?event=${event.id}`)
     await expect.poll(() => page.evaluate(() => document.body.style.overflow)).not.toBe('hidden')
     await page.goto(`${base}/verdant/djs`)
-    await page.getByRole('combobox', { name: 'Ir para página' }).selectOption('/verdant/cadastros')
+    await bottom.getByRole('button', { name: 'Mais', exact: true }).click()
+    await page.getByRole('dialog', { name: 'Menu lateral' }).getByRole('link', { name: 'Cadastros', exact: true }).click()
     await expect(page).toHaveURL(`${base}/verdant/cadastros`)
     assert.deepEqual(errors, [])
   } finally {

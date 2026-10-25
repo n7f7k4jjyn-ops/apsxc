@@ -1,4 +1,6 @@
-import { type ChangeEvent, type FormEvent, useEffect, useState } from 'react'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
+import { type ChangeEvent, type FormEvent, useEffect, useRef, useState, type ReactNode } from 'react'
 import { getRouteApi } from '@tanstack/react-router'
 import { SlidersHorizontal, ArrowUpAZ, ArrowDownAZ } from 'lucide-react'
 import { toast } from 'sonner'
@@ -70,7 +72,9 @@ export function Apps() {
   const [sort, setSort] = useState(initSort)
   const [appType, setAppType] = useState(type)
   const [searchTerm, setSearchTerm] = useState(filter)
+  const [settingsPanel, setSettingsPanel] = useState<string | null>(null)
   const [settings, setSettings] = useState<IntegrationSettings>(emptySettings)
+  const savedSettings = useRef<IntegrationSettings>(emptySettings)
   const [settingsLoading, setSettingsLoading] = useState(true)
   const [settingsLoaded, setSettingsLoaded] = useState(false)
   const [settingsSaving, setSettingsSaving] = useState(false)
@@ -88,7 +92,7 @@ export function Apps() {
           const response = await fetch('/api/admin/integrations', { credentials: 'same-origin', cache: 'no-store' })
           const result = await response.json() as { settings?: IntegrationSettings; error?: string }
           if (!response.ok || !result.settings) throw new Error(result.error || 'Não foi possível carregar as configurações.')
-          if (alive) setSettings(result.settings)
+          if (alive) { setSettings(result.settings); savedSettings.current = result.settings }
         }
         if (alive) setSettingsLoaded(true)
       } catch (error) {
@@ -125,6 +129,7 @@ export function Apps() {
       const result = await response.json() as { settings?: IntegrationSettings; error?: string }
       if (!response.ok || !result.settings) throw new Error(result.error || 'Não foi possível salvar as configurações.')
       setSettings(result.settings)
+      savedSettings.current = result.settings
       setGmailSecret('')
       setTelegramToken('')
       setClearGmailSecret(false)
@@ -197,32 +202,37 @@ export function Apps() {
           <p className='text-muted-foreground'>{<LocalizedText text="Catálogo de serviços. A conexão OAuth/API ainda precisa ser configurada para cada serviço." leadingSpace trailingSpace />}</p>
         </div>
         <div role='status' className='rounded-lg border border-amber-300/60 bg-amber-50/70 px-4 py-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100'>{<LocalizedText text="Esses serviços estão em implantação: as configurações podem ser salvas por administradores. Somente o Meta Pixel está ativo nesta versão; os demais atalhos ainda não." />}</div>
-        {isAdmin && <details id='integracoes' className='rounded-lg border p-4'>
-          <summary className='cursor-pointer font-semibold'>{<LocalizedText text='Configurações administrativas de integrações' />}</summary>
+        <div className='mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3'>
+          {isAdmin && <Card><CardHeader><CardTitle>Meta Pixel</CardTitle><CardDescription>Configure o rastreamento dos formulários públicos.</CardDescription></CardHeader><CardContent><Button className='min-h-11' variant='outline' onClick={() => setSettingsPanel('Meta Pixel')}>Configurar Meta Pixel</Button></CardContent></Card>}
+          {isAdmin && <Card id='integracoes'><CardHeader><CardTitle>Configurações gerais</CardTitle><CardDescription>Revise os destinos e as credenciais das integrações.</CardDescription></CardHeader><CardContent><Button className='min-h-11' variant='outline' onClick={() => setSettingsPanel('Todas as integrações')}>Abrir configurações gerais</Button></CardContent></Card>}
+          {isAdmin && isZigMaster && <AppToolCard id='zig' title='Zig' description='Conexão, clientes, pendências e conversão das listas em entradas.'><ZigIntegration /><ZigSalesConversion /></AppToolCard>}
+          {isAdmin && isZigMaster && <AppToolCard id='mesclar-eventos' title='Mesclar eventos duplicados' description='Simule e confira a união de eventos antes de confirmar.'><EventMerge /></AppToolCard>}
+        </div>
+        {isAdmin && <Dialog open={settingsPanel !== null} onOpenChange={open => {
+          if (open || settingsSaving) return
+          const changed = JSON.stringify(settings) !== JSON.stringify(savedSettings.current) || gmailSecret || telegramToken || clearGmailSecret || clearTelegramToken
+          if (changed && !window.confirm('Descartar as alterações não salvas desta integração?')) return
+          setSettings(savedSettings.current); setGmailSecret(''); setTelegramToken(''); setClearGmailSecret(false); setClearTelegramToken(false); setSettingsPanel(null)
+        }}>
+          <DialogContent className='sm:max-w-4xl'>
+            <DialogHeader><DialogTitle>{settingsPanel}</DialogTitle><DialogDescription>Configurações administrativas de integrações</DialogDescription></DialogHeader>
           {settingsLoading ? <p className='pt-4 text-sm text-muted-foreground'>{<LocalizedText text='Carregando configurações…' />}</p> : !settingsLoaded ? <p role='alert' className='pt-4 text-sm text-destructive'>{settingsError || translate('Não foi possível carregar as configurações.')}</p> : <form onSubmit={saveIntegrationSettings} className='mt-4 space-y-4'>
             <p className='text-sm text-muted-foreground'>{<LocalizedText text='As configurações ficam no servidor. Segredos nunca são devolvidos à interface; campos vazios preservam credenciais salvas. O Meta Pixel é o único item ativo: ao salvar o ID, os formulários públicos passam a registrar visualização e envio.' />}</p>
             <div className='grid gap-4 md:grid-cols-2'>
-              <label className='space-y-1.5 text-sm font-medium'>{<LocalizedText text='ID do Meta Pixel' />}<Input value={settings.metaPixelId} onChange={(event) => setSettings((current) => ({ ...current, metaPixelId: event.target.value }))} inputMode='numeric' maxLength={30} placeholder='Somente números' /><span className='block text-xs font-normal text-muted-foreground'><LocalizedText text='Ativo em todos os formulários públicos: PageView ao abrir, Lead após inscrição nas listas ou candidatura e TeamRegistrationUpdated após atualização da equipe. Não inclui os dados preenchidos nos eventos. Deixe vazio para desativar.' /></span></label>
-              <label className='space-y-1.5 text-sm font-medium'>{<LocalizedText text='WhatsApp: telefone ou link wa.me' />}<Input value={settings.whatsappTarget} onChange={(event) => setSettings((current) => ({ ...current, whatsappTarget: event.target.value }))} maxLength={254} placeholder='+55 41 99999-9999 ou https://wa.me/...' /></label>
-              <label className='space-y-1.5 text-sm font-medium'>{<LocalizedText text='Gmail: e-mail de contato' />}<Input value={settings.gmailTarget} onChange={(event) => setSettings((current) => ({ ...current, gmailTarget: event.target.value }))} type='email' maxLength={254} placeholder='contato@exemplo.com' /></label>
-              <label className='space-y-1.5 text-sm font-medium'>{<LocalizedText text='Gmail OAuth Client ID (opcional)' />}<Input value={settings.gmailClientId} onChange={(event) => setSettings((current) => ({ ...current, gmailClientId: event.target.value }))} maxLength={512} /></label>
-              <label className='space-y-1.5 text-sm font-medium'>{<LocalizedText text='Gmail OAuth Client Secret (opcional)' />}<Input value={gmailSecret} onChange={(event) => setGmailSecret(event.target.value)} type='password' autoComplete='new-password' maxLength={2048} placeholder={settings.credentials.gmailClientSecretConfigured ? translate('Já configurado; deixe vazio para manter') : translate('Configure a chave de criptografia no servidor')} /><span className='flex items-center gap-2 text-xs font-normal text-muted-foreground'><input type='checkbox' checked={clearGmailSecret} onChange={(event) => setClearGmailSecret(event.target.checked)} className='size-4 accent-emerald-700' /><LocalizedText text='Remover segredo salvo' /></span></label>
-              <label className='space-y-1.5 text-sm font-medium'>{<LocalizedText text='Telegram: @usuário ou link t.me' />}<Input value={settings.telegramTarget} onChange={(event) => setSettings((current) => ({ ...current, telegramTarget: event.target.value }))} maxLength={254} placeholder='@usuario' /></label>
-              <label className='space-y-1.5 text-sm font-medium'>{<LocalizedText text='Telegram Bot Token (opcional)' />}<Input value={telegramToken} onChange={(event) => setTelegramToken(event.target.value)} type='password' autoComplete='new-password' maxLength={1024} placeholder={settings.credentials.telegramBotTokenConfigured ? translate('Já configurado; deixe vazio para manter') : translate('Configure a chave de criptografia no servidor')} /><span className='flex items-center gap-2 text-xs font-normal text-muted-foreground'><input type='checkbox' checked={clearTelegramToken} onChange={(event) => setClearTelegramToken(event.target.checked)} className='size-4 accent-emerald-700' /><LocalizedText text='Remover segredo salvo' /></span></label>
+              {(settingsPanel === 'Todas as integrações' || settingsPanel === 'Meta Pixel') && <><label className='space-y-1.5 text-sm font-medium'>{<LocalizedText text='ID do Meta Pixel' />}<Input value={settings.metaPixelId} onChange={(event) => setSettings((current) => ({ ...current, metaPixelId: event.target.value }))} inputMode='numeric' maxLength={30} placeholder='Somente números' /><span className='block text-xs font-normal text-muted-foreground'><LocalizedText text='Ativo em todos os formulários públicos: PageView ao abrir, Lead após inscrição nas listas ou candidatura e TeamRegistrationUpdated após atualização da equipe. Não inclui os dados preenchidos nos eventos. Deixe vazio para desativar.' /></span></label></>}
+              {(settingsPanel === 'Todas as integrações' || settingsPanel === 'WhatsApp') && <><label className='space-y-1.5 text-sm font-medium'>{<LocalizedText text='WhatsApp: telefone ou link wa.me' />}<Input value={settings.whatsappTarget} onChange={(event) => setSettings((current) => ({ ...current, whatsappTarget: event.target.value }))} maxLength={254} placeholder='+55 41 99999-9999 ou https://wa.me/...' /></label></>}
+              {(settingsPanel === 'Todas as integrações' || settingsPanel === 'Gmail') && <><label className='space-y-1.5 text-sm font-medium'>{<LocalizedText text='Gmail: e-mail de contato' />}<Input value={settings.gmailTarget} onChange={(event) => setSettings((current) => ({ ...current, gmailTarget: event.target.value }))} type='email' maxLength={254} placeholder='contato@exemplo.com' /></label></>}
+              {(settingsPanel === 'Todas as integrações' || settingsPanel === 'Gmail') && <><label className='space-y-1.5 text-sm font-medium'>{<LocalizedText text='Gmail OAuth Client ID (opcional)' />}<Input value={settings.gmailClientId} onChange={(event) => setSettings((current) => ({ ...current, gmailClientId: event.target.value }))} maxLength={512} /></label></>}
+              {(settingsPanel === 'Todas as integrações' || settingsPanel === 'Gmail') && <><label className='space-y-1.5 text-sm font-medium'>{<LocalizedText text='Gmail OAuth Client Secret (opcional)' />}<Input value={gmailSecret} onChange={(event) => setGmailSecret(event.target.value)} type='password' autoComplete='new-password' maxLength={2048} placeholder={settings.credentials.gmailClientSecretConfigured ? translate('Já configurado; deixe vazio para manter') : translate('Configure a chave de criptografia no servidor')} /><span className='flex items-center gap-2 text-xs font-normal text-muted-foreground'><input type='checkbox' checked={clearGmailSecret} onChange={(event) => setClearGmailSecret(event.target.checked)} className='size-4 accent-emerald-700' /><LocalizedText text='Remover segredo salvo' /></span></label></>}
+              {(settingsPanel === 'Todas as integrações' || settingsPanel === 'Telegram') && <><label className='space-y-1.5 text-sm font-medium'>{<LocalizedText text='Telegram: @usuário ou link t.me' />}<Input value={settings.telegramTarget} onChange={(event) => setSettings((current) => ({ ...current, telegramTarget: event.target.value }))} maxLength={254} placeholder='@usuario' /></label></>}
+              {(settingsPanel === 'Todas as integrações' || settingsPanel === 'Telegram') && <><label className='space-y-1.5 text-sm font-medium'>{<LocalizedText text='Telegram Bot Token (opcional)' />}<Input value={telegramToken} onChange={(event) => setTelegramToken(event.target.value)} type='password' autoComplete='new-password' maxLength={1024} placeholder={settings.credentials.telegramBotTokenConfigured ? translate('Já configurado; deixe vazio para manter') : translate('Configure a chave de criptografia no servidor')} /><span className='flex items-center gap-2 text-xs font-normal text-muted-foreground'><input type='checkbox' checked={clearTelegramToken} onChange={(event) => setClearTelegramToken(event.target.checked)} className='size-4 accent-emerald-700' /><LocalizedText text='Remover segredo salvo' /></span></label></>}
             </div>
             <p className='text-xs text-muted-foreground'><LocalizedText text='Gmail e Telegram permanecem inativos até que os fluxos de autorização sejam implementados. Segredos informados são armazenados criptografados e não ativam sincronização nem envio de mensagens.' /></p>
             {settingsError && <p role='alert' className='text-sm text-destructive'>{settingsError}</p>}
             <Button type='submit' disabled={settingsSaving}>{settingsSaving ? translate('Salvando…') : translate('Salvar configurações')}</Button>
           </form>}
-        </details>}
-        {isAdmin && isZigMaster && <details id='zig' className='rounded-lg border p-4'>
-          <summary className='cursor-pointer font-semibold'>Zig: conexão e prévia de clientes (somente consulta)</summary>
-          <div className='mt-4 space-y-4'><ZigIntegration /><ZigSalesConversion /></div>
-        </details>}
-        {isAdmin && isZigMaster && <details id='mesclar-eventos' className='rounded-lg border p-4'>
-          <summary className='cursor-pointer font-semibold'>Mesclar eventos duplicados</summary>
-          <div className='mt-4'><EventMerge /></div>
-        </details>}
+          </DialogContent>
+        </Dialog>}
         {!isAdmin && <p role='status' className='text-xs text-muted-foreground'><LocalizedText text='A configuração de integrações está disponível somente para administradores.' /></p>}
         <div className='my-4 flex items-end justify-between sm:my-0 sm:items-center'>
           <div className='flex flex-col gap-4 sm:my-4 sm:flex-row'>
@@ -269,26 +279,32 @@ export function Apps() {
         <Separator className='shadow-sm' />
         <ul className='faded-bottom no-scrollbar grid gap-4 overflow-auto pt-4 pb-16 md:grid-cols-2 lg:grid-cols-3'>
           {filteredApps.map((app) => (
-            <li
-              key={app.name}
-              className='rounded-lg border p-4 hover:shadow-md'
-            >
-              <div className='mb-8 flex items-center justify-between'>
-                <div
-                  className={`flex size-10 items-center justify-center rounded-lg bg-muted p-2`}
-                >
-                  {app.logo}
-                </div>
-                <span className='rounded-full border px-2.5 py-1 text-xs text-muted-foreground'><LocalizedText text='Em implantação' /></span>
-              </div>
-              <div>
-                <h2 className='mb-1 font-semibold'>{app.name}</h2>
-                <p className='line-clamp-2 text-gray-500'><LocalizedText text={app.name === 'WhatsApp' ? 'O destino pode ser configurado pelo administrador; o atalho não fica ativo até a implantação.' : 'O destino e as credenciais podem ser configurados pelo administrador; OAuth, sincronização e envio não estão ativos.'} /></p>
-              </div>
+            <li key={app.name} className='min-w-0'>
+              {isAdmin ? <Card className='h-full min-w-0'><CardHeader><div className='flex size-10 items-center justify-center rounded-lg bg-muted p-2'>{app.logo}</div><CardTitle>{app.name}</CardTitle><CardDescription>Destino e credenciais · em implantação</CardDescription></CardHeader><CardContent><Button className='min-h-11' variant='outline' onClick={() => setSettingsPanel(app.name)}>Configurar {app.name}</Button></CardContent></Card> : <AppToolCard title={app.name} description='Serviço em implantação. A configuração está disponível somente para administradores.' icon={app.logo}><p className='text-sm text-muted-foreground'>A conexão deste app depende da configuração e autorização do administrador.</p></AppToolCard>}
             </li>
           ))}
         </ul>
       </Main>
     </>
   )
+}
+
+function AppToolCard({ id, title, description, icon, children }: { id?: string; title: string; description: string; icon?: ReactNode; children: ReactNode }) {
+  const [open, setOpen] = useState(() => !!id && window.location.hash === `#${id}`)
+  const touched = useRef(false)
+  function changeOpen(next: boolean) {
+    if (!next && touched.current && !window.confirm('Fechar este app? Confira se salvou as alterações antes de sair.')) return
+    if (!next) touched.current = false
+    setOpen(next)
+  }
+  return <Dialog open={open} onOpenChange={changeOpen}>
+    <Card id={id} className='h-full min-w-0'>
+      <CardHeader>{icon && <div className='flex size-10 items-center justify-center rounded-lg bg-muted p-2'>{icon}</div>}<CardTitle>{title}</CardTitle><CardDescription>{description}</CardDescription></CardHeader>
+      <CardContent><DialogTrigger asChild><Button className='min-h-11' variant='outline'>Abrir {title}</Button></DialogTrigger></CardContent>
+    </Card>
+    <DialogContent className='sm:max-w-5xl' onInteractOutside={event => event.preventDefault()}>
+      <DialogHeader><DialogTitle>{title}</DialogTitle><DialogDescription>{description}</DialogDescription></DialogHeader>
+      <div className='min-w-0 space-y-4' onChangeCapture={() => { touched.current = true }}>{children}</div>
+    </DialogContent>
+  </Dialog>
 }

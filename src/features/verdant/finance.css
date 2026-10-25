@@ -138,3 +138,14 @@
 .finance-import-tools {scroll-margin-top:140px;border-color:var(--primary)}
 .finance-import-tools > summary {padding-block:4px;color:var(--primary)}
 .finance-import-tools[open] > .finance-panel {margin-top:16px}
+
+/* Financial totals stay in their cards and retain the full currency value. */
+.finance-compact-summary { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,150px),1fr)); overflow: visible; }
+.finance-compact-summary button { min-width: 0; padding: 12px; }
+.finance-compact-summary strong,.finance-summary strong { display: block; width: 100%; min-width: 0; white-space: normal; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.finance-summary > * { min-width: 0; }
+@media(max-width:767px) {
+  .finance-compact-summary { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .finance-compact-summary button:last-child:nth-child(odd) { grid-column: 1 / -1; }
+  .finance-actions > button { flex: 1 1 120px; min-height: 44px; white-space: normal; height: auto; }
+}

@@ -1,3 +1,6 @@
+import { FitValue } from '@/components/fit-value'
+import { MonthFilter } from './month-filter'
+import { monthRange } from './month-range'
 import { ColumnFilterControl, SortableTableHeader } from './list-controls'
 import { sortRows, type SortDirection } from './data'
 import {
@@ -683,6 +686,7 @@ function AdminFinance() {
           ))}
         </div>
         <div className='finance-grid'>
+          <MonthFilter value={from && from.endsWith('-01') && monthRange(from.slice(0, 7)).to === to ? from.slice(0, 7) : ''} onChange={value => { const range = monthRange(value); setFrom(range.from); setTo(range.to); setEventId('') }} />
           <Field id='finance-from' label='Data inicial'>
             <Input
               id='finance-from'
@@ -726,7 +730,7 @@ function AdminFinance() {
         </p>
       </Card>
       </details>
-      {report && <nav className='finance-compact-summary' aria-label='Indicadores financeiros'>{[['Recebido',report.incoming],['Pago',report.outgoing],['Saldo',report.balance],['A pagar',report.payable],['A receber',report.receivable]].map(([label,value])=><button type='button' key={label} onClick={()=>{setSearch('');setCategory('');if(label==='A pagar'||label==='A receber'){setType(label==='A pagar'?'payable':'receivable');setStatus('pending');setTab('ledger')}else{setType('');setStatus('');setTab('cash')}}}><span>{label}</span><strong>{formatCents(Number(value))}</strong></button>)}</nav>}
+      {report && <nav className='finance-compact-summary' aria-label='Indicadores financeiros'>{[['Recebido',report.incoming],['Pago',report.outgoing],['Saldo',report.balance],['A pagar',report.payable],['A receber',report.receivable]].map(([label,value])=><button type='button' key={label} onClick={()=>{setSearch('');setCategory('');if(label==='A pagar'||label==='A receber'){setType(label==='A pagar'?'payable':'receivable');setStatus('pending');setTab('ledger')}else{setType('');setStatus('');setTab('cash')}}}><span>{label}</span><strong><FitValue value={formatCents(Number(value))} maxSize={20} /></strong></button>)}</nav>}
       {report && (
         <details className='finance-period-details'><summary>Detalhar caixa registrado e pagamentos</summary><section aria-label='Resumo financeiro'>
           <h2>Caixa registrado</h2>
@@ -751,7 +755,7 @@ function AdminFinance() {
             ).map(([label, value]) => (
               <Card className='finance-panel' key={label}>
                 <h3>{label}</h3>
-                <strong>{formatCents(value)}</strong>
+                <strong><FitValue value={formatCents(value)} maxSize={22} /></strong>
               </Card>
             ))}
           </div>
