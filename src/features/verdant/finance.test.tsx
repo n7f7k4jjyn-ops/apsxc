@@ -150,8 +150,8 @@ describe('FinancePage', () => {
       .element(screen.getByRole('button', { name: 'Novo lançamento' }))
       .toBeEnabled()
     await userEvent.click(screen.getByText(/^Período:/))
-    await userEvent.fill(screen.getByLabelText('Data inicial'), '2026-10-31')
-    await userEvent.fill(screen.getByLabelText('Data final'), '2026-10-01')
+    await userEvent.fill(screen.getByRole('textbox', { name: 'Data inicial' }), '2026-10-31')
+    await userEvent.fill(screen.getByRole('textbox', { name: 'Data final' }), '2026-10-01')
     await expect
       .element(screen.getByText(/Relatório indisponível:/))
       .toBeInTheDocument()
@@ -549,8 +549,8 @@ describe('FinancePage', () => {
       .element(screen.getByRole('button', { name: 'Novo lançamento' }))
       .toBeEnabled()
     await userEvent.click(screen.getByText(/^Período:/))
-    await userEvent.fill(screen.getByLabelText('Data inicial'), '2026-10-01')
-    await userEvent.fill(screen.getByLabelText('Data final'), '2026-10-31')
+    await userEvent.fill(screen.getByRole('textbox', { name: 'Data inicial' }), '2026-10-01')
+    await userEvent.fill(screen.getByRole('textbox', { name: 'Data final' }), '2026-10-31')
     await expect
       .element(
         screen.getByRole('button', { name: 'Detalhes de Aluguel do espaço' })

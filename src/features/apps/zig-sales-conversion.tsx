@@ -42,6 +42,7 @@ export function ZigSalesConversion() {
   const [sales, setSales] = useState<SalesPreview | null>(null)
   const [report, setReport] = useState<SalesReport | null>(null)
   const [saved, setSaved] = useState('')
+  const [historyProgress, setHistoryProgress] = useState('')
 
   async function run<T>(name: string, action: () => Promise<T>) {
     setBusy(name)
@@ -76,6 +77,33 @@ export function ZigSalesConversion() {
     }
   }
 
+  async function importHistory() {
+    if (!window.confirm('Importar resumos históricos de julho a outubro de 2026? A operação não lança receitas no Financeiro nem altera eventos existentes.')) return
+    setBusy('history')
+    setError('')
+    setHistoryProgress('Iniciando importação…')
+    let added = 0
+    let updated = 0
+    const failed: string[] = []
+    // Intervalos curtos evitam o limite de 5 eventos por consulta Zig.
+    const end = new Date('2026-10-25T00:00:00Z')
+    for (let day = new Date('2026-07-01T00:00:00Z'); day <= end; day.setUTCDate(day.getUTCDate() + 1)) {
+      const date = day.toISOString().slice(0, 10)
+      setHistoryProgress(`Importando ${date} · ${added} novos, ${updated} atualizados · ${failed.length} pendências`)
+      try {
+        const result = await api<{ saved: { added: number; updated: number } }>('report/save', { dtinicio: date, dtfim: date })
+        added += result.saved.added
+        updated += result.saved.updated
+      } catch (failure) {
+        failed.push(`${date}: ${failure instanceof Error ? failure.message : 'Falha desconhecida'}`)
+      }
+    }
+    setHistoryProgress(`Concluído: ${added} novos, ${updated} atualizados; ${failed.length} dia(s) com pendência.`)
+    if (failed.length) setError(`Datas não importadas: ${failed.join(' | ')}`)
+    else toast.success('Histórico Zig de julho a outubro importado.')
+    setBusy('')
+  }
+
   async function record() {
     if (!sales) return
     const text = `Lançar no Financeiro?\n\n• ${sales.plan.creates} receitas novas (já recebidas) serão criadas\n• ${sales.plan.unchanged} já existem e ficam como estão\n• Nada é apagado nem sobrescrito. Um backup do Financeiro é gerado antes.`
@@ -98,7 +126,9 @@ export function ZigSalesConversion() {
         <Button type='submit' value='sales' variant='outline' disabled={busy !== ''}>{busy === 'sales' ? 'Consultando…' : 'Prévia do caixa'}</Button>
                 <Button type='submit' value='report' variant='outline' disabled={busy !== ''}>{busy === 'report' ? 'Salvando…' : 'Salvar resumo dos eventos'}</Button>
               </div>
-              {saved && <p role='status' className='text-sm text-emerald-700 dark:text-emerald-300'>{saved}</p>}
+              <Button type='button' variant='outline' disabled={busy !== ''} onClick={() => void importHistory()}>{busy === 'history' ? 'Importando histórico…' : 'Importar histórico jul–out/2026'}</Button>
+      {historyProgress && <p role='status' className='text-xs'>{historyProgress}</p>}
+      {saved && <p role='status' className='text-sm text-emerald-700 dark:text-emerald-300'>{saved}</p>}
       {error && <p role='alert' className='text-sm text-destructive'>{error}</p>}
 
       {conversion && (
