@@ -1100,11 +1100,10 @@ function FormConfigEditor({ config, event, data, update }: { config: FormConfig;
         </div>
         <div className='flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 wide'>
           <div><b className='text-sm'>{<LocalizedText text={"Campos do formulário"} />}</b><p className='text-xs text-muted-foreground'>{<LocalizedText text={"Escolha quais dados a pessoa precisa informar nesta lista."} />}</p></div>
-          <Button type='button' size='sm' variant='outline' onClick={() => setFieldsDialogOpen(true)}><Settings2 size={14} />{<LocalizedText text={"Configurar obrigatoriedade"} leadingSpace />}</Button>
+          <Button type='button' size='sm' variant='outline' aria-expanded={fieldsDialogOpen} aria-controls={`required-fields-${config.id}`} onClick={() => setFieldsDialogOpen(value => !value)}><Settings2 size={14} />{<LocalizedText text={"Configurar obrigatoriedade"} leadingSpace />}</Button>
         </div>
-        <Dialog open={fieldsDialogOpen} onOpenChange={setFieldsDialogOpen}>
-          <DialogContent>
-            <DialogHeader><DialogTitle><LocalizedText text='Campos obrigatórios' /></DialogTitle><DialogDescription><LocalizedText text='Essas regras valem para esta lista e esta data.' /></DialogDescription></DialogHeader>
+        {fieldsDialogOpen && <section id={`required-fields-${config.id}`} role='region' aria-label='Campos obrigatórios' className='rounded-lg border bg-muted/20 p-4'>
+            <h3 className='font-semibold'><LocalizedText text='Campos obrigatórios' /></h3><p className='mt-1 text-sm text-muted-foreground'><LocalizedText text='Essas regras valem para esta lista e esta data.' /></p>
             {([
               ['name', 'Nome completo'],
               ['whatsapp', 'WhatsApp com DDD'],
@@ -1116,8 +1115,7 @@ function FormConfigEditor({ config, event, data, update }: { config: FormConfig;
             </label>)}
             <p className='mb-4 text-xs text-muted-foreground'>{<LocalizedText text={"Por padrão, a pessoa escolhe Sim ou Não. Marcar Não é permitido; o aceite para receber novidades continua voluntário."} />}</p>
             <div className='flex justify-end'><Button type='button' onClick={() => setFieldsDialogOpen(false)}>{<LocalizedText text={"Concluir"} />}</Button></div>
-          </DialogContent>
-        </Dialog>
+        </section>}
         {message && <div role={messageIsError ? 'alert' : 'status'} aria-live={messageIsError ? 'assertive' : 'polite'} className={`verdant-flash ${messageIsError ? 'warning' : ''}`}>{message}</div>}
         <div className='verdant-config-footer'><small>{open ? `Aberto agora · encerra ${compactDate(event.date)} às ${draft.cutoff}` : `Link fixo: /lista/${slugByForm[config.key]}`}</small><Button size='sm' type='submit'>{<LocalizedText text={"Salvar configuração"} />}</Button></div>
       </form>

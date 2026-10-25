@@ -194,8 +194,9 @@ test('event workflow and touch navigation across desktop, tablet and mobile', { 
     await formCards.nth(2).getByRole('button').click()
     await page.getByRole('dialog').locator('.verdant-config-card summary').first().click()
     await page.getByRole('button', { name: 'Configurar obrigatoriedade', exact: true }).first().click()
-    await expect(page.getByRole('dialog', { name: 'Campos obrigatórios', exact: true })).toBeVisible()
-    await page.keyboard.press('Escape')
+    await expect(page.getByRole('region', { name: 'Campos obrigatórios', exact: true })).toBeVisible()
+    await page.getByRole('button', { name: 'Concluir', exact: true }).click()
+    await expect(page.getByRole('region', { name: 'Campos obrigatórios', exact: true })).toHaveCount(0)
     await expect(page.getByRole('dialog')).toHaveCount(1)
     await page.getByRole('dialog').getByRole('button', { name: 'Fechar', exact: true }).click()
     // Selecting a month alone must include only events of that month, not submission dates.
