@@ -1,3 +1,5 @@
+import { useOperationMonth } from './use-operation-month'
+import { useOperationFilter } from './use-operation-filter'
 import { FilterDateInput } from '@/components/filter-date-input'
 import { FitValue } from '@/components/fit-value'
 import { MonthFilter } from './month-filter'
@@ -255,9 +257,10 @@ function AdminFinance() {
   const [tab, setTab] = useState<'ledger' | 'cash' | 'summary' | 'influencer-payouts' | 'influencer-report'>('ledger')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkEvent, setBulkEvent] = useState('')
-  const [from, setFrom] = useState('')
-  const [to, setTo] = useState('')
-  const [eventId, setEventId] = useState(()=>new URLSearchParams(window.location.search).get('event') || '')
+  const [selectedMonth, setSelectedMonth] = useOperationMonth(true, false)
+  const [from, setFrom] = useState(() => monthRange(selectedMonth).from)
+  const [to, setTo] = useState(() => monthRange(selectedMonth).to)
+  const [eventId, setEventId] = useOperationFilter('event')
   const eventOptions = useMemo(() => {
     const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date())
     return [...(data?.events ?? [])].filter(event => event.id === eventId || (from || to ? (!from || event.date >= from) && (!to || event.date <= to) : event.active !== false && event.date >= today)).sort((a,b) => a.date.localeCompare(b.date) || a.name.localeCompare(b.name))
@@ -688,7 +691,7 @@ function AdminFinance() {
           ))}
         </div>
         <div className='finance-grid'>
-          <MonthFilter value={from && from.endsWith('-01') && monthRange(from.slice(0, 7)).to === to ? from.slice(0, 7) : ''} onChange={value => { const range = monthRange(value); setFrom(range.from); setTo(range.to); setEventId('') }} />
+          <MonthFilter value={from && from.endsWith('-01') && monthRange(from.slice(0, 7)).to === to ? from.slice(0, 7) : ''} onChange={value => { const range = monthRange(value); setFrom(range.from); setTo(range.to); setSelectedMonth(value) }} />
           <Field id='finance-from' label='Data inicial'>
             <FilterDateInput id='finance-from' label='Data inicial' className='h-11 rounded-md border bg-background px-3' value={from} onValueChange={setFrom} />
           </Field>
@@ -852,6 +855,7 @@ function AdminFinance() {
                     <td>
                       {entry.description}
                       <small>{entry.counterparty}</small>
+                      <small>{entry.externalId.startsWith('zig:billing:') ? 'Zig · faturamento' : entry.externalId.startsWith('zig:sales:') ? 'Zig · consumo antigo · revisar' : entry.externalId.startsWith('zig:') ? 'Importado da Zig' : entry.externalId.startsWith('manual:') || !entry.externalId ? 'Lançamento manual' : 'Importação / vínculo externo'}</small>
                     </td>
                     <td>{data?.events.find(event => event.id === entry.eventId)?.name || 'Sem evento'}</td>
                     <td>
