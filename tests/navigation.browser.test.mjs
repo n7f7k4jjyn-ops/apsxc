@@ -356,7 +356,8 @@ test('event workflow and touch navigation across desktop, tablet and mobile', { 
     const influencerDialog = page.getByRole('dialog', { name: 'Influencers', exact: true })
     await influencerDialog.getByRole('button', { name: 'Gerar relatório de repasse de influencers', exact: true }).click()
     await expect(influencerDialog.getByRole('alert')).toHaveCount(0)
-    await expect(influencerDialog.locator('.verdant-influencer-payout-table tbody tr'), `Influencer report diagnostic: ${await influencerDialog.textContent()}`).toHaveCount(1)
+    const payoutRows = influencerDialog.locator('.verdant-influencer-payout-table tbody tr')
+    await expect(payoutRows, `Influencer report diagnostic: ${await influencerDialog.textContent()}`).toHaveCount(1)
     for (const width of [320, 390, 1280]) {
       await page.setViewportSize({ width, height: 900 })
       const cells = influencerDialog.locator('.verdant-influencer-payout-table tbody td')
