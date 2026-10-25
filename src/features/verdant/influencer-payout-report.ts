@@ -10,7 +10,7 @@ export type PayoutAdmissions = {
     confirmedAt: string
     confirmedBy: string
   }[]
-  registrations: { id: string; eventId: string; influencerId: string }[]
+  registrations: { id: string; eventId: string; influencerId: string; eventDate?: string; eventName?: string }[]
 }
 export type PayoutRow = {
   eventId: string
@@ -39,7 +39,7 @@ export function influencerPayoutRows(
   )
     throw new Error('Confira o período do relatório.')
   const rows = new Map<string, PayoutRow>()
-  function get(id: string, personId: string, fallbackDate = '') {
+  function get(id: string, personId: string, fallbackDate = '', fallbackName = '') {
     const event = finance.events.find((e) => e.id === id)
     const date = event?.date || fallbackDate
     if (
@@ -52,7 +52,7 @@ export function influencerPayoutRows(
     if (!rows.has(key))
       rows.set(key, {
         eventId: id,
-        event: event?.name || 'Evento indisponível',
+        event: event?.name || fallbackName || 'Evento indisponível',
         date,
         influencerId: personId,
         influencer:
@@ -80,7 +80,7 @@ export function influencerPayoutRows(
       )
     if (seenRegistrations.has(registration.id)) continue
     seenRegistrations.add(registration.id)
-    const row = get(registration.eventId, registration.influencerId)
+    const row = get(registration.eventId, registration.influencerId, registration.eventDate, registration.eventName)
     if (row) row.registered++
   }
   const seen = new Set<string>()
