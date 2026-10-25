@@ -26,11 +26,14 @@ const sale = (extra) => ({ transactionId: 't1', transactionDate: '2026-10-09T23:
 test('Zig: conversão lista → presença e receita no Financeiro com backup e sem duplicar', { timeout: 60000 }, async () => {
   const directory = await mkdtemp(path.join(tmpdir(), 'verdant-zig-sales-'))
   const zigRequests = []
+  let billingDelta = 0
   const zig = createHttpServer((request, response) => {
     const url = new URL(request.url, 'http://zig.test')
     zigRequests.push({ method: request.method, path: url.pathname, query: Object.fromEntries(url.searchParams) })
     response.setHeader('content-type', 'application/json')
     if (request.headers.authorization !== TOKEN) { response.statusCode = 401; return response.end('{}') }
+    if (url.pathname === '/erp/lojas') return response.end(JSON.stringify([{ id: 'L1', name: 'Verdant' }, { id: 'L2', name: 'Outra' }]))
+    if (url.pathname === '/erp/faturamento') return response.end(JSON.stringify([{ paymentId: 1, paymentName: 'Cartão de Crédito', value: 3000000 + billingDelta, redeId: 'rede-1', lojaId: 'L1', eventId: 'E1', eventDate: '2026-10-09' }, { paymentId: 2, paymentName: 'Pix', value: 69374, redeId: 'rede-1', lojaId: 'L1', eventId: 'E1', eventDate: '2026-10-09' }]))
     if (url.pathname === '/erp/events') return response.end(JSON.stringify([{ id: 'E1', name: 'Noite', beginAt: '2026-10-09T22:00:00' }]))
     if (url.pathname === '/erp/checkins') {
       return response.end(JSON.stringify([
@@ -117,28 +120,56 @@ test('Zig: conversão lista → presença e receita no Financeiro com backup e s
     assert.deepEqual(event.lists.map((list) => [list.list, list.registered, list.came]), [['DJS', 2, 1]])
 
     const preview = JSON.parse((await call(admin, 'sales/preview', period)).text).preview
-    assert.equal(preview.events[0].totalCents, 2500 + 3000)
+    assert.equal(preview.events[0].totalCents, 3069374)
+    assert.equal(preview.events[0].consumptionCents, 5500)
+    assert.equal(preview.revenueSource, '/erp/faturamento')
+    assert.ok(zigRequests.some(item => item.path === '/erp/faturamento'))
     assert.equal(preview.events[0].refundedCents, 1000)
     assert.deepEqual(preview.events[0].excluded, [{ type: 'ZigCard', cents: 10000 }])
     assert.equal(preview.plan.creates, 2)
     assert.ok(zigRequests.every((item) => item.method === 'GET'))
+    if (process.env.ZIG_SALES_BROWSER === '1') {
+      const { chromium, expect } = await import('playwright/test')
+      const browser = await chromium.launch({ headless: true })
+      try {
+        const context = await browser.newContext({ viewport: { width: 390, height: 900 } })
+        await context.addCookies([{ name: admin.split('=')[0], value: admin.slice(admin.indexOf('=')+1), url }])
+        const page = await context.newPage()
+        const errors=[];page.on('pageerror', error => errors.push(error.message))
+        await page.goto(`${url}/apps`)
+        await page.getByRole('button', { name: 'Abrir Zig', exact: true }).click()
+        const panel=page.getByRole('dialog',{name:'Zig',exact:true}).locator('form').filter({has:page.getByRole('heading',{name:'Conversão das listas e caixa',exact:true})})
+        await panel.getByLabel('Data inicial',{exact:true}).fill(period.dtinicio)
+        await panel.getByLabel('Data final',{exact:true}).fill(period.dtfim)
+        await panel.getByRole('button',{name:'Prévia do faturamento',exact:true}).click()
+        await expect(panel.getByText(/Faturamento R\$\s*30\.693,74/)).toBeVisible()
+        await expect(panel.getByText(/Consumo em produtos: R\$\s*55,00/)).toBeVisible()
+        await expect(panel.getByRole('list',{name:'Faturamento por pagamento'})).toContainText('Pix')
+        assert.deepEqual(errors,[])
+      } finally { await browser.close() }
+    }
     const financeBefore = await (await fetch(`${url}/api/finance`, { headers: { Cookie: admin } })).json()
     assert.equal(financeBefore.entries.length, 0)
 
     assert.equal((await call(admin, 'sales/apply', period)).status, 400)
-    assert.equal((await call(admin, 'sales/apply', { ...period, confirm: true, expected: { creates: 1 } })).status, 409)
+    assert.equal((await call(admin, 'sales/apply', { ...period, confirm: true, expected: { creates: 1, fingerprint: preview.fingerprint } })).status, 409)
     assert.equal((await (await fetch(`${url}/api/finance`, { headers: { Cookie: admin } })).json()).entries.length, 0)
     assert.deepEqual(await readdir(env.VERDANT_BACKUP_DIR).catch(() => []), [])
 
-    const applied = JSON.parse((await call(admin, 'sales/apply', { ...period, confirm: true, expected: { creates: 2 } })).text).report
+    billingDelta = 8000
+    assert.equal((await call(admin, 'sales/apply', { ...period, confirm: true, expected: { creates: 2, fingerprint: preview.fingerprint } })).status, 409, 'same count with changed values must not be recorded')
+    assert.equal((await (await fetch(`${url}/api/finance`, { headers: { Cookie: admin } })).json()).entries.length, 0)
+    billingDelta = 0
+    const applied = JSON.parse((await call(admin, 'sales/apply', { ...period, confirm: true, expected: { creates: 2, fingerprint: preview.fingerprint } })).text).report
     assert.equal(applied.created, 2)
     assert.ok(applied.backup)
     assert.ok((await readdir(env.VERDANT_BACKUP_DIR)).includes(applied.backup))
     const finance = await (await fetch(`${url}/api/finance`, { headers: { Cookie: admin } })).json()
-    assert.deepEqual(finance.entries.map((entry) => entry.amountCents).sort(), [2500, 3000])
-    assert.ok(finance.entries.every((entry) => entry.type === 'receivable' && entry.status === 'settled' && entry.eventId === seedEvent.id && entry.category === 'sales' && entry.externalId.startsWith('zig:sales:L1:E1:')))
+    assert.deepEqual(finance.entries.map((entry) => entry.amountCents).sort(), [3000000, 69374])
+    assert.ok(finance.entries.every((entry) => entry.type === 'receivable' && entry.status === 'settled' && entry.eventId === seedEvent.id && entry.category === 'sales' && entry.externalId.startsWith('zig:billing:L1:E1:')))
 
-    const again = JSON.parse((await call(admin, 'sales/apply', { ...period, confirm: true, expected: { creates: 0 } })).text).report
+    const nextPreview = JSON.parse((await call(admin, 'sales/preview', period)).text).preview
+    const again = JSON.parse((await call(admin, 'sales/apply', { ...period, confirm: true, expected: { creates: 0, fingerprint: nextPreview.fingerprint } })).text).report
     assert.equal(again.created, 0)
     assert.equal(again.unchanged, 2)
     assert.equal((await (await fetch(`${url}/api/finance`, { headers: { Cookie: admin } })).json()).entries.length, 2)
@@ -151,10 +182,17 @@ test('Zig: conversão lista → presença e receita no Financeiro com backup e s
     assert.equal(reports[0].presentInHouse, 2)
     assert.equal(reports[0].registered, 2)
     assert.equal(reports[0].cameFromLists, 1)
-    assert.equal(reports[0].totalCents, 5500)
-    assert.equal(reports[0].avgTicketCents, 2750)
+    assert.equal(reports[0].totalCents, 3069374)
+    assert.equal(reports[0].consumptionCents, 5500)
+    assert.equal(reports[0].schemaVersion, 2)
+    assert.equal(reports[0].avgTicketCents, 1534687)
     assert.equal((await fetch(`${url}/api/finance/zig-reports`, { headers: { Cookie: other } })).status, 200)
     assert.equal((await fetch(`${url}/api/finance/zig-reports`)).status, 401)
+    await call(admin, 'config', { lojaId: 'L2', lojaName: 'Outra' }, 'PUT')
+    assert.equal((await (await fetch(`${url}/api/finance/zig-reports`, { headers: { Cookie: admin } })).json()).reports.length, 0, 'reports from another store are hidden')
+    await call(admin, 'config', { lojaId: 'INVALID', lojaName: 'Inexistente' }, 'PUT')
+    assert.equal(JSON.parse((await call(admin, 'test', {})).text).ok, false)
+    assert.equal((await call(admin, 'conversion', period)).status, 409, 'unknown store cannot query data')
     assert.ok(!logs.includes(TOKEN))
   } finally {
     child.kill()

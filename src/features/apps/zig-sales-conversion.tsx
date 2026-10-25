@@ -11,11 +11,12 @@ type ConversionEvent = {
 type Conversion = { events: ConversionEvent[]; notes: string[]; inconclusive: number; unconfirmedPresence: number; assumptions: string[] }
 type SalesEvent = {
   eventId: string; eventName: string; eventDate: string; totalCents: number; refundedCents: number
+  billingAvailable: boolean; consumptionCents: number; billing: { paymentName: string; cents: number }[]
   revenue: { type: string; label: string; cents: number; transactions: number }[]
   excluded: { type: string; cents: number }[]
 }
 type SalesPreview = {
-  warnings: string[]; events: SalesEvent[]
+  fingerprint: string; warnings: string[]; events: SalesEvent[]
   plan: { creates: number; unchanged: number; conflicts: { externalId: string; description: string; existingCents: number; zigCents: number }[] }
 }
 type SalesReport = { backup: string; created: number; unchanged: number; conflicts: unknown[] }
@@ -106,24 +107,24 @@ export function ZigSalesConversion() {
 
   async function record() {
     if (!sales) return
-    const text = `Lançar no Financeiro?\n\n• ${sales.plan.creates} receitas novas (já recebidas) serão criadas\n• ${sales.plan.unchanged} já existem e ficam como estão\n• Nada é apagado nem sobrescrito. Um backup do Financeiro é gerado antes.`
+    const text = `Lançar no Financeiro?\n\n• ${sales.plan.creates} receitas novas de faturamento por pagamento (sem somar consumo ou adquirência) serão criadas\n• ${sales.plan.unchanged} já existem e ficam como estão\n• Nada é apagado nem sobrescrito. Um backup do Financeiro é gerado antes.`
     if (!window.confirm(text)) return
-    const result = await run('record', () => api<{ report: SalesReport }>('sales/apply', { dtinicio, dtfim, confirm: true, expected: { creates: sales.plan.creates } }))
+    const result = await run('record', () => api<{ report: SalesReport }>('sales/apply', { dtinicio, dtfim, confirm: true, expected: { creates: sales.plan.creates, fingerprint: sales.fingerprint } }))
     if (!result) return
     setReport(result.report)
     setSales(null)
-    toast.success('Receita da Zig lançada no Financeiro.')
+    toast.success('Faturamento da Zig lançado no Financeiro.')
   }
 
   return (
     <form onSubmit={submit} className='space-y-3 rounded-md border p-3'>
       <h3 className='text-sm font-semibold'>Conversão das listas e caixa</h3>
-      <p className='text-xs text-muted-foreground'>Use um evento já encerrado (no máximo 5 eventos). Conversão: quem se inscreveu nas listas e teve presença confirmada na Zig. Caixa: receita de bar, couvert e ingressos lançada no Financeiro como receita já recebida, com confirmação e backup. Recargas, gorjetas e estornos não entram como receita. “Salvar resumo dos eventos” guarda público, listas, receita e ticket médio de cada evento (mesmo sem evento criado no app) para a aba Financeiro → Resumo financeiro; não altera lançamentos.</p>
+      <p className='text-xs text-muted-foreground'>Use um evento já encerrado (no máximo 5 eventos). Conversão: quem se inscreveu nas listas e teve presença confirmada na Zig. Financeiro: faturamento informado pela Zig por forma de pagamento, com confirmação e backup. Consumo em produtos, adquirência e repasse bancário são informações diferentes e não são somados. “Salvar resumo dos eventos” guarda público, listas, receita e ticket médio de cada evento (mesmo sem evento criado no app) para a aba Financeiro → Resumo financeiro; não altera lançamentos.</p>
       <div className='flex flex-wrap items-end gap-3'>
         <label className='space-y-1 text-sm font-medium'>Data inicial<Input type='date' value={dtinicio} onChange={(event) => setDtinicio(event.target.value)} required /></label>
         <label className='space-y-1 text-sm font-medium'>Data final<Input type='date' value={dtfim} onChange={(event) => setDtfim(event.target.value)} required /></label>
         <Button type='submit' value='conversion' disabled={busy !== ''}>{busy === 'conversion' ? 'Consultando…' : 'Calcular conversão'}</Button>
-        <Button type='submit' value='sales' variant='outline' disabled={busy !== ''}>{busy === 'sales' ? 'Consultando…' : 'Prévia do caixa'}</Button>
+        <Button type='submit' value='sales' variant='outline' disabled={busy !== ''}>{busy === 'sales' ? 'Consultando…' : 'Prévia do faturamento'}</Button>
                 <Button type='submit' value='report' variant='outline' disabled={busy !== ''}>{busy === 'report' ? 'Salvando…' : 'Salvar resumo dos eventos'}</Button>
               </div>
               <Button type='button' variant='outline' disabled={busy !== ''} onClick={() => void importHistory()}>{busy === 'history' ? 'Importando histórico…' : 'Importar histórico jul–out/2026'}</Button>
@@ -138,8 +139,8 @@ export function ZigSalesConversion() {
               <p className='font-medium'>{item.zigEventName || item.zigEventId} <span className='font-normal text-muted-foreground'>· {item.date}{item.appEventName ? ` · app: ${item.appEventName}` : ''}</span></p>
               {item.calculated ? (
                 <>
-                  <p>Inscritos: <b>{item.registered}</b> · Compareceram: <b>{item.came}</b> · Conversão: <b>{percent(item.conversionPercent)}</b> · Presentes na casa: {item.presentInHouse} · Sem lista: {item.walkInsWithoutList}</p>
-                  <ul className='space-y-0.5 text-xs'>
+                  <p>Inscritos: <b>{item.registered}</b> · Compareceram: <b>{item.came}</b> · Conversão: <b>{percent(item.conversionPercent)}</b> · Público estimado por check-ins: {item.presentInHouse} · Sem lista: {item.walkInsWithoutList}</p>
+                                <ul className='space-y-0.5 text-xs'>
                     {item.lists?.map((row) => <li key={row.list}>{row.list}: {row.came}/{row.registered} ({percent(row.conversionPercent)})</li>)}
                   </ul>
                 </>
@@ -152,14 +153,17 @@ export function ZigSalesConversion() {
         </div>
       )}
 
+      <p className='text-sm text-muted-foreground'>Faturamento é o total de pagamentos informado pela Zig, por forma de pagamento. Saída de produtos mostra consumo; adquirência e repasse bancário não são somados. Relatórios antigos precisam ser consultados novamente.</p>
       {sales && (
         <div className='space-y-3 text-sm'>
           {sales.events.map((item) => (
             <div key={item.eventId} className='space-y-1 rounded border p-2'>
-              <p className='font-medium'>{item.eventName || item.eventId} <span className='font-normal text-muted-foreground'>· {item.eventDate}</span> · Total {money(item.totalCents)}</p>
+              <p className='font-medium'>{item.eventName || item.eventId} <span className='font-normal text-muted-foreground'>· {item.eventDate}</span> · Faturamento {item.billingAvailable ? money(item.totalCents) : 'não retornado'}</p>
+              <p>Consumo em produtos: {money(item.consumptionCents)} · não somado ao faturamento.</p>
+              <ul aria-label='Faturamento por pagamento'>{item.billing.map(payment => <li key={payment.paymentName}>{payment.paymentName}: {money(payment.cents)}</li>)}</ul>
               <ul className='space-y-0.5 text-xs'>
                 {item.revenue.map((row) => <li key={row.type}>{row.label}: {money(row.cents)} ({row.transactions} transações)</li>)}
-                {item.excluded.map((row) => <li key={row.type} className='text-muted-foreground'>Fora da receita ({row.type}): {money(row.cents)}</li>)}
+                {item.excluded.map((row) => <li key={row.type} className='text-muted-foreground'>Consumo separado ({row.type}): {money(row.cents)}</li>)}
                 <li className='text-muted-foreground'>Estornados (não somados): {money(item.refundedCents)}</li>
               </ul>
             </div>
@@ -167,7 +171,7 @@ export function ZigSalesConversion() {
           {sales.warnings.map((text) => <p key={text} className='text-xs text-amber-700 dark:text-amber-300'>{text}</p>)}
           {sales.plan.conflicts.map((row) => <p key={row.externalId} className='text-xs text-amber-700 dark:text-amber-300'>{row.description}: já lançado com {money(row.existingCents)}, a Zig agora informa {money(row.zigCents)}. Não foi alterado.</p>)}
           <p>Lançamentos novos: <b>{sales.plan.creates}</b> · Já existentes: {sales.plan.unchanged}</p>
-          <Button type='button' disabled={busy !== '' || sales.plan.creates === 0} onClick={() => void record()}>{busy === 'record' ? 'Lançando…' : 'Lançar no Financeiro'}</Button>
+          <Button type='button' disabled={busy !== '' || sales.plan.creates === 0 || sales.plan.conflicts.length > 0} onClick={() => void record()}>{busy === 'record' ? 'Lançando…' : 'Lançar no Financeiro'}</Button>
         </div>
       )}
       {report && (
