@@ -21,6 +21,7 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  optimizeDeps: { include: ['@radix-ui/react-popover', 'date-fns/locale', 'react-day-picker'] },
   test: {
     silent: 'passed-only',
     unstubEnvs: true,

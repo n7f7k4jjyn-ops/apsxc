@@ -1,3 +1,4 @@
+import { FilterDateInput } from '@/components/filter-date-input'
 import { useState, type ReactNode } from 'react'
 import { ListFilter } from 'lucide-react'
 import { LocalizedText, useLanguage } from '@/context/language-provider'
@@ -48,7 +49,7 @@ export function ColumnFilterControl({
                 </option>
               ))}
             </select>
-          ) : (
+          ) : inputType === 'date' ? <FilterDateInput label={`${translate('Filtrar')}: ${translate(label)}`} value={value} onValueChange={onChange} /> : (
             <input
               type={inputType}
               aria-label={`${translate('Filtrar')}: ${translate(label)}`}

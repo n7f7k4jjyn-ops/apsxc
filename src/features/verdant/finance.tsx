@@ -1,3 +1,4 @@
+import { FilterDateInput } from '@/components/filter-date-input'
 import { FitValue } from '@/components/fit-value'
 import { MonthFilter } from './month-filter'
 import { monthRange } from './month-range'
@@ -254,13 +255,14 @@ function AdminFinance() {
   const [tab, setTab] = useState<'ledger' | 'cash' | 'summary' | 'influencer-payouts' | 'influencer-report'>('ledger')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkEvent, setBulkEvent] = useState('')
-  const eventOptions = useMemo(
-    () => [...(data?.events ?? [])].sort((a, b) => Number(a.active === false) - Number(b.active === false) || a.date.localeCompare(b.date) || a.name.localeCompare(b.name)),
-    [data?.events]
-  )
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [eventId, setEventId] = useState(()=>new URLSearchParams(window.location.search).get('event') || '')
+  const eventOptions = useMemo(() => {
+    const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date())
+    return [...(data?.events ?? [])].filter(event => event.id === eventId || (from || to ? (!from || event.date >= from) && (!to || event.date <= to) : event.active !== false && event.date >= today)).sort((a,b) => a.date.localeCompare(b.date) || a.name.localeCompare(b.name))
+  }, [data?.events, from, to, eventId])
+
   const [type, setType] = useState('')
   const [status, setStatus] = useState('')
   const [category, setCategory] = useState('')
@@ -688,20 +690,10 @@ function AdminFinance() {
         <div className='finance-grid'>
           <MonthFilter value={from && from.endsWith('-01') && monthRange(from.slice(0, 7)).to === to ? from.slice(0, 7) : ''} onChange={value => { const range = monthRange(value); setFrom(range.from); setTo(range.to); setEventId('') }} />
           <Field id='finance-from' label='Data inicial'>
-            <Input
-              id='finance-from'
-              type='date'
-              value={from}
-              onChange={(e) => setFrom(e.target.value)}
-            />
+            <FilterDateInput id='finance-from' label='Data inicial' className='h-11 rounded-md border bg-background px-3' value={from} onValueChange={setFrom} />
           </Field>
           <Field id='finance-to' label='Data final'>
-            <Input
-              id='finance-to'
-              type='date'
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-            />
+            <FilterDateInput id='finance-to' label='Data final' className='h-11 rounded-md border bg-background px-3' value={to} onValueChange={setTo} />
           </Field>
           <Field id='finance-event-filter' label='Evento'>
             <select

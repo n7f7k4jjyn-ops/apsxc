@@ -1,3 +1,4 @@
+import { FilterDateInput } from '@/components/filter-date-input'
 import { sortRows, type SortDirection } from './data'
 import { ColumnFilterControl, SortableTableHeader } from './list-controls'
 import { useState } from 'react'
@@ -115,21 +116,11 @@ export function InfluencerPayoutReportPanel({ eventId, from: sharedFrom, to: sha
       <div className='flex flex-wrap gap-3'>
         <label>
           De{' '}
-          <input
-            type='date'
-            value={from}
-            disabled={busy || sharedFrom !== undefined}
-            onChange={(e) => setFrom(e.target.value)}
-          />
+          <FilterDateInput label='De' value={from} disabled={busy || sharedFrom !== undefined} onValueChange={setFrom} className='h-11 rounded-md border bg-background px-3' />
         </label>
         <label>
           Até{' '}
-          <input
-            type='date'
-            value={to}
-            disabled={busy || sharedTo !== undefined}
-            onChange={(e) => setTo(e.target.value)}
-          />
+          <FilterDateInput label='Até' value={to} disabled={busy || sharedTo !== undefined} onValueChange={setTo} className='h-11 rounded-md border bg-background px-3' />
         </label>
       </div>
       <Button disabled={busy} onClick={() => void generate()}>
@@ -206,7 +197,7 @@ export function InfluencerPayoutReportPanel({ eventId, from: sharedFrom, to: sha
           </div>
           <div className='verdant-column-filter-bar'><ColumnFilterControl label='Evento / influencer' value={query} onChange={setQuery} /></div>
           <div className='overflow-x-auto'>
-            <table>
+            <table className='verdant-table verdant-influencer-payout-table'>
               <thead>
                 <tr>
                   <SortableTableHeader label='Data / evento' active={sortKey === 'date'} direction={direction} onClick={() => toggle('date')} />
@@ -222,16 +213,14 @@ export function InfluencerPayoutReportPanel({ eventId, from: sharedFrom, to: sha
               <tbody>
                 {displayRows.map((row) => (
                   <tr key={JSON.stringify([row.eventId, row.influencerId])}>
-                    <td>
-                      {row.date} · {row.event}
-                    </td>
-                    <td>{row.influencer}</td>
-                    <td>{row.registered}</td>
-                    <td>{row.validated}</td>
-                    <td>{formatCents(row.toGenerate)}</td>
-                    <td>{formatCents(row.pending)}</td>
-                    <td>{formatCents(row.paid)}</td>
-                    <td>{formatCents(row.cancelled)}</td>
+                    <td data-label='Data / evento'><span className='verdant-payout-event'><b>{row.event}</b><small>{row.date}</small></span></td>
+                    <td data-label='Influencer'><span>{row.influencer}</span></td>
+                    <td data-label='Inscrições'><span>{row.registered}</span></td>
+                    <td data-label='Entradas'><span>{row.validated}</span></td>
+                    <td data-label='A gerar'><span>{formatCents(row.toGenerate)}</span></td>
+                    <td data-label='Pendente'><span>{formatCents(row.pending)}</span></td>
+                    <td data-label='Pago'><span>{formatCents(row.paid)}</span></td>
+                    <td data-label='Cancelado'><span>{formatCents(row.cancelled)}</span></td>
                   </tr>
                 ))}
               </tbody>
