@@ -594,7 +594,7 @@ function AgendaPage({ data, update }: { data: VerdantState; update: (mutate: (st
                     onChange={(ids) => { setSelectedEventProfessionalIds(ids); setDirty(true) }}
                   />
                 </> : <section className='verdant-event-form-configs'>
-                  <div className='verdant-event-form-configs-heading'><div><h3>{<LocalizedText text={"Configuração das listas deste evento"} />}</h3><p>{<LocalizedText text={"Todas as regras e vínculos serão gravados junto com o evento."} />}</p></div><span>{<LocalizedText text={"5 formulários"} />}</span></div>
+                  <div className='verdant-event-form-configs-heading'><div><h3>{<LocalizedText text={"Configuração das listas deste evento"} />}</h3><p>{<LocalizedText text={"Todas as regras e vínculos serão gravados junto com o evento."} />}</p></div><span>{FORM_DEFS.length} <LocalizedText text="formulários" /></span></div>
                   {FORM_DEFS.map((definition, index) => {
                     const config = draftConfigs.find((item) => item.key === definition.key)
                     if (!config) return null
@@ -1289,7 +1289,7 @@ function RegistrationsPage({
       {standalone && <EventWorkflowNav event={eventById(data, eventId)} />}
       <Card>
         <CardContent className='pt-6'>
-          <div className='mb-4'><h2 className='font-semibold'>{<LocalizedText text={"Inscrições dos formulários"} />}</h2><p className='mt-1 text-sm text-muted-foreground'>{<LocalizedText text={"Respostas novas recebidas nos cinco formulários."} />}</p></div>
+          <div className='mb-4'><h2 className='font-semibold'>{<LocalizedText text={"Inscrições dos formulários"} />}</h2><p className='mt-1 text-sm text-muted-foreground'>{<LocalizedText text={"Respostas recebidas pelos formulários de listas."} />}</p></div>
           <div className='verdant-column-filter-bar'>
             <MonthFilter value={month} onChange={value => { setMonth(value); if (!standalone) setEventId(''); setFrom(''); setTo('') }} />
             <label className='verdant-search-field'><Search size={16} aria-hidden='true' /><span className='sr-only'><LocalizedText text='Buscar inscrições' /></span><input type='search' value={query} onChange={(event) => setQuery(event.target.value)} placeholder='Buscar nome, WhatsApp ou e-mail' /></label>

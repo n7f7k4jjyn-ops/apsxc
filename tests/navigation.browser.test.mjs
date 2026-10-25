@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { scryptSync } from 'node:crypto'
 import { once } from 'node:events'
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -60,7 +60,13 @@ test('event workflow and touch navigation across desktop, tablet and mobile', { 
   let logs = ''
   child.stdout.on('data', (chunk) => { logs += chunk })
   child.stderr.on('data', (chunk) => { logs += chunk })
-  let browser
+  let browser, page
+  const capture = async name => {
+    if (!page || !process.env.NAV_QA_ARTIFACT_DIR) return
+    await mkdir(process.env.NAV_QA_ARTIFACT_DIR, { recursive: true })
+    await page.waitForTimeout(200)
+    await page.screenshot({ path: path.join(process.env.NAV_QA_ARTIFACT_DIR, `${name}.png`), fullPage: page.viewportSize().width >= 768 })
+  }
   try {
     let ready = false
     for (let i = 0; i < 100; i++) {
@@ -69,12 +75,12 @@ test('event workflow and touch navigation across desktop, tablet and mobile', { 
       await delay(100)
     }
     assert.ok(ready, `Local server must start: ${logs}`)
-    browser = await chromium.launch({ headless: true })
+    browser = await chromium.launch({ headless: true, ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH, args: ['--no-sandbox', '--disable-gpu'] } : {}) })
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 } })
     assert.equal((await context.request.post(`${base}/api/auth/login`, {
       data: { username: 'qa-navigation', password },
     })).status(), 200)
-    const page = await context.newPage()
+    page = await context.newPage()
     await page.clock.setFixedTime(new Date('2026-10-24T21:00:00Z'))
     const errors = []
     page.on('pageerror', (error) => errors.push(error.message))
@@ -123,6 +129,7 @@ test('event workflow and touch navigation across desktop, tablet and mobile', { 
         await expect(reportDialog).toBeVisible()
         const box = await reportDialog.boundingBox()
         assert.ok(box.x >= -1 && box.x + box.width <= width + 1, `${title} dialog must fit viewport`)
+        if (width === 390 && title === 'DJs') await capture('relatorios-djs-mobile')
         await reportDialog.getByRole('button', { name: 'Fechar', exact: true }).click()
         await expect(reportDialog).toBeHidden()
       }
@@ -158,6 +165,7 @@ test('event workflow and touch navigation across desktop, tablet and mobile', { 
         const dialog = page.getByRole('dialog')
         await expect(dialog.getByText('Logo do formulário', { exact: true })).toBeVisible()
         await expect(dialog.getByRole('button', { name: 'Salvar texto do formulário', exact: true })).toBeVisible()
+        if (width === 390 && i === 0) await capture('formularios-mobile')
         const box = await dialog.boundingBox()
         assert.ok(box.x >= -1 && box.x + box.width <= width + 1, 'Form dialog must fit viewport')
         await dialog.getByRole('button', { name: 'Fechar', exact: true }).click()
@@ -263,9 +271,11 @@ test('event workflow and touch navigation across desktop, tablet and mobile', { 
     await page.getByText('Personalizar período', { exact: true }).click()
     await expect(page.getByLabel('Data inicial', { exact: true })).toHaveValue('2026-09-01')
     await expect(page.getByLabel('Data final', { exact: true })).toHaveValue('2026-09-30')
+    await page.getByText('Personalizar período', { exact: true }).click()
     for (const width of [320, 390, 768, 1440]) {
       await page.setViewportSize({ width, height: 900 })
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `Summary must fit ${width}px`)
+      if (width === 390 || width === 1440) await capture(`resumo-${width}`)
       for (const value of await page.locator('[data-fit-value]').all()) {
         assert.ok(await value.evaluate(element => element.scrollWidth <= element.clientWidth + 1), 'Full numbers must fit their cards')
       }
@@ -275,6 +285,7 @@ test('event workflow and touch navigation across desktop, tablet and mobile', { 
     for (const width of [320, 390, 768, 1440]) {
       await page.setViewportSize({ width, height: 900 })
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `Financial summary must fit ${width}px`)
+      if (width === 390 || width === 1440) await capture(`financeiro-${width}`)
     }
     await page.goto(`${base}/verdant/conteudo`)
     await page.getByLabel('Mês', { exact: true }).fill('2026-09')
@@ -290,6 +301,10 @@ test('event workflow and touch navigation across desktop, tablet and mobile', { 
       await expect(dialog).toBeVisible()
       await dialog.getByRole('button', { name: 'Fechar', exact: true }).click()
     }
+    await page.setViewportSize({ width: 390, height: 900 })
+    await page.getByRole('button', { name: 'Configurar Gmail', exact: true }).click()
+    await capture('apps-mobile')
+    await page.getByRole('dialog', { name: 'Gmail', exact: true }).getByRole('button', { name: 'Fechar', exact: true }).click()
     await page.goto(`${base}/verdant/exportacoes?event=${event.id}`)
     await page.setViewportSize({ width: 375, height: 812 })
     const bottom = page.getByRole('navigation', { name: 'Navegação mobile' })
@@ -325,6 +340,9 @@ test('event workflow and touch navigation across desktop, tablet and mobile', { 
     await page.getByRole('dialog', { name: 'Menu lateral' }).getByRole('link', { name: 'Cadastros', exact: true }).click()
     await expect(page).toHaveURL(`${base}/verdant/cadastros`)
     assert.deepEqual(errors, [])
+  } catch (error) {
+    await capture('failure').catch(() => {})
+    throw error
   } finally {
     if (browser) await browser.close()
     const exited = once(child, 'exit')

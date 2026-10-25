@@ -219,3 +219,8 @@
   .verdant-report-dialog > .verdant-export-actions { position: sticky; bottom: -16px; z-index: 1; background: var(--background); padding-block: 12px; }
   main input,main textarea,[data-slot=dialog-content] input,[data-slot=dialog-content] textarea { scroll-margin-block: 70px; }
 }
+@media(max-width:767px) {
+  main button:not([role=checkbox]):not([role=switch]),[data-slot=dialog-content] button,[data-slot=select-trigger] { min-height: 44px; }
+  [data-slot=dialog-content] > [data-slot=dialog-header] { grid-column: 1; grid-row: 1; padding-inline-end: 52px; }
+  [data-slot=dialog-content] > [data-slot=dialog-close] { position: sticky; grid-column: 1; grid-row: 1; justify-self: end; align-self: start; inset-inline-end: auto; top: 0; z-index: 3; display: flex; width: 44px; height: 44px; align-items: center; justify-content: center; }
+}

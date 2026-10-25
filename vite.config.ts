@@ -22,14 +22,32 @@ export default defineConfig({
     },
   },
   test: {
-    include: ['src/**/*.{test,spec}.{ts,tsx}'],
     silent: 'passed-only',
     unstubEnvs: true,
-    browser: {
-      enabled: true,
-      provider: playwright(),
-      instances: [{ browser: 'chromium' }],
-    },
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: 'unit-globals',
+          include: ['src/features/verdant/store.test.ts', 'src/features/verdant/meta-pixel.test.ts'],
+          browser: { enabled: false },
+          environment: 'node',
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'app',
+          include: ['src/**/*.{test,spec}.{ts,tsx}'],
+          exclude: ['src/features/verdant/store.test.ts', 'src/features/verdant/meta-pixel.test.ts'],
+          browser: {
+            enabled: true,
+            provider: playwright(),
+            instances: [{ browser: 'chromium' }],
+          },
+        },
+      },
+    ],
     coverage: {
       // include: ['src/**/*.{js,jsx,ts,tsx}'], // Uncomment to expand the report to all src/**/* so untested modules appear as 0% coverage.
       exclude: [

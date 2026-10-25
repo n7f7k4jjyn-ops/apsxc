@@ -60,15 +60,15 @@ Verificação focada: `npm test -- src/lib/navigation.test.ts src/lib/auth-guard
 
 O diagnóstico priorizou o percurso **Resumo → Agenda → Listas → Inscrições → Relatórios**. As fricções tratadas foram o excesso de cabeçalho no celular, a perda do evento entre telas, links internos com recarga/redirecionamento, busca escondida entre filtros e controles operacionais de 42 px. Rotas públicas, permissões, persistência e regras financeiras permanecem inalteradas.
 
-Teste focado de navegação/contexto:
+Validação completa de componentes e navegação:
 
 ```bash
-npm test -- src/components/layout/page-context.test.tsx src/components/layout/mobile-navigation.test.tsx src/features/verdant/event-workflow.test.tsx
+npm test
 npm run build
 node --test tests/navigation.browser.test.mjs
 ```
 
-O teste de navegador inicia um servidor isolado, usa dados fictícios em diretório temporário e verifica as páginas operacionais em 320, 375, 430, 768 e 1280 px.
+A suíte completa separa os testes que simulam globais do navegador dos componentes executados no Chromium. O teste integrado inicia um servidor isolado, usa dados fictícios em diretório temporário e verifica as páginas operacionais entre 320 e 1440 px, os pop-ups, o mês, os arquivos PDF/CSV e os rascunhos.
 
 Roteiro manual de revisão:
 

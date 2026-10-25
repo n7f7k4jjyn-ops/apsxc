@@ -39,6 +39,7 @@ describe('gráfico de inscrições por lista', () => {
       ['Lover', 0],
       ['VIP', 0],
       ['Aniversário', 0],
+      ['Entrada gratuita', 0],
     ])
   })
 
@@ -51,7 +52,7 @@ describe('gráfico de inscrições por lista', () => {
 
     const buckets = buildBuckets(registrations, [], new Date('2026-10-15T12:00:00-03:00'), 'day', 'lists')
 
-    expect(buckets).toHaveLength(5)
+    expect(buckets).toHaveLength(6)
     expect(buckets.find(({ name }) => name === 'DJs')?.total).toBe(1)
     expect(buckets.find(({ name }) => name === 'VIP')?.total).toBe(1)
   })
