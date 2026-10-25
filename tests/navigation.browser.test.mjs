@@ -78,7 +78,8 @@ test('event workflow and touch navigation across desktop, tablet and mobile', { 
     }
     assert.ok(ready, `Local server must start: ${logs}`)
     browser = await chromium.launch({ headless: true, ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH, args: ['--no-sandbox', '--disable-gpu'] } : {}) })
-    const context = await browser.newContext({ viewport: { width: 1280, height: 900 } })
+    // API fixtures must reach Playwright routing instead of the PWA worker.
+    const context = await browser.newContext({ serviceWorkers: 'block', viewport: { width: 1280, height: 900 } })
     assert.equal((await context.request.post(`${base}/api/auth/login`, {
       data: { username: 'qa-navigation', password },
     })).status(), 200)
@@ -398,7 +399,7 @@ test('event workflow and touch navigation across desktop, tablet and mobile', { 
     await expect(page.getByRole('dialog', { name: 'Menu lateral' })).toBeHidden()
     await expect(page).toHaveURL(`${base}/verdant/inscricoes`)
     await bottom.getByRole('link', { name: 'Agenda', exact: true }).click()
-    await page.getByRole('gridcell', { name: /^9, / }).click()
+    await page.getByRole('gridcell', { name: new RegExp(`^${Number(event.date.slice(-2))}, `) }).click()
     await page.getByRole('button', { name: new RegExp(event.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) }).click()
     const editor = page.getByRole('dialog', { name: 'Editar evento' })
     await editor.getByLabel('Nome do evento', { exact: true }).fill('Rascunho não salvo')
