@@ -400,7 +400,7 @@ test('event workflow and touch navigation across desktop, tablet and mobile', { 
     await expect(page.getByRole('dialog', { name: 'Menu lateral' })).toBeHidden()
     await expect(page).toHaveURL(`${base}/verdant/inscricoes`)
     await bottom.getByRole('link', { name: 'Agenda', exact: true }).click()
-    await page.getByRole('gridcell', { name: /^9, / }).click()
+    await page.getByRole('gridcell', { name: new RegExp(`^${Number(event.date.slice(8))}, `) }).click()
     await page.getByRole('button', { name: new RegExp(event.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) }).click()
     const editor = page.getByRole('dialog', { name: 'Editar evento' })
     await editor.getByLabel('Nome do evento', { exact: true }).fill('Rascunho não salvo')
