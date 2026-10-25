@@ -153,6 +153,7 @@ export function FinancialSummary({
           </Button>
         </div>
         {summarySwitch}
+        {data?.entries.some(entry => entry.externalId?.startsWith('zig:sales:') && entry.status !== 'cancelled') && <p role='alert' className='rounded-lg border border-amber-500/50 p-3 text-sm'>Existem importações antigas da Zig baseadas em consumo. Os totais do livro financeiro ainda incluem esses lançamentos; confira-os antes de considerar o faturamento conciliado. A consulta de faturamento corrigida não os soma novamente.</p>}
         {!connected && (
           <p role='alert'>
             Aguardando sincronização dos eventos. Nenhum total financeiro foi
