@@ -28,6 +28,7 @@ jobs:
         env:
           ZIG_SALES_BROWSER: '1'
       - run: node tests/rosters.browser.test.mjs
+      - run: node --test tests/mobile-performance.browser.test.mjs
       - run: node --test tests/navigation.browser.test.mjs
       - run: node --test tests/production-import.integration.test.mjs
         env:

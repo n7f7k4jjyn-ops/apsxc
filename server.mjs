@@ -1,6 +1,7 @@
 import { testStaffChanges } from './lib/test-staff.mjs'
 import { validateRoster, teamStatus } from './lib/rosters.mjs'
 import { registryClientPage, applicationStatuses, registryIdentity, latestTeam, promotedTeam } from './lib/registry.mjs'
+import { staticAsset } from './lib/static-assets.mjs'
 import { createServer } from 'node:http'
 import { createCipheriv, createDecipheriv, createHash, randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto'
 import { isIP } from 'node:net'
@@ -1648,10 +1649,14 @@ async function serveStatic(request, response, pathname) {
     if (extension === '.html' && formMeta && target === path.join(dist, 'index.html')) {
       const html = personalizeFormShareHtml(await readFile(target, 'utf8'), formSlug, PUBLIC_BASE_URL)
       response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' })
-      response.end(html)
+      response.end(request.method === 'HEAD' ? undefined : html)
       return
     }
+    const asset = await staticAsset(target, request.headers['accept-encoding'])
     response.writeHead(200, {
+      Vary: 'Accept-Encoding',
+      'Content-Length': asset.size,
+      ...(asset.encoding ? { 'Content-Encoding': asset.encoding } : {}),
       'Content-Type': mime[extension] || 'application/octet-stream',
       'Cache-Control': extension === '.html'
         ? 'no-cache'
@@ -1659,7 +1664,8 @@ async function serveStatic(request, response, pathname) {
           ? 'public, max-age=31536000, immutable'
           : 'public, max-age=604800',
     })
-    createReadStream(target).pipe(response)
+    if (request.method === 'HEAD') response.end()
+    else createReadStream(asset.target).pipe(response)
   } catch {
     response.writeHead(503).end('O painel ainda não foi compilado.')
   }
@@ -2779,7 +2785,7 @@ const server = createServer(async (request, response) => {
       })
       return sendJson(response, 201, { ok: true })
     }
-    if (request.method === 'GET') return serveStatic(request, response, url.pathname)
+    if (request.method === 'GET' || request.method === 'HEAD') return serveStatic(request, response, url.pathname)
     return sendJson(response, 404, { error: 'Rota não encontrada.' })
   } catch (error) {
     return sendJson(response, Number(error?.status) || 500, { error: error instanceof Error ? error.message : 'Erro ao processar a solicitação.' })
