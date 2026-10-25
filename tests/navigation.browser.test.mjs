@@ -289,6 +289,8 @@ test('event workflow and touch navigation across desktop, tablet and mobile', { 
     await expect(page.getByRole('button', { name: 'Abrir Zig', exact: true })).toHaveCount(0)
     await page.goto(base)
     await expect(page.getByRole('region', { name: 'Indicadores da operação' })).toBeVisible()
+    const summaryFilters = page.getByRole('group', { name: 'Filtros do resumo' })
+    if (!(await summaryFilters.evaluate((element) => element.open))) await summaryFilters.locator('summary').click()
     await page.getByLabel('Evento em foco', { exact: true }).selectOption(event.id)
     await page.getByRole('button', { name: 'Ver listas do evento', exact: true }).click()
     const eventLists = page.getByRole('dialog', { name: 'Listas do evento', exact: true })
