@@ -1,4 +1,3 @@
-import { MobileBottomNav } from './mobile-bottom-nav'
 import { useEffect } from 'react'
 import { Outlet, useLocation, useRouter } from '@tanstack/react-router'
 import { getCookie } from '@/lib/cookies'
@@ -13,6 +12,7 @@ import {
 import { AppSidebar } from '@/components/layout/app-sidebar'
 import { ChatNotifications } from '@/components/layout/chat-notifications'
 import { SkipToMain } from '@/components/skip-to-main'
+import { MobileBottomNav } from './mobile-bottom-nav'
 
 function NavigationLifecycle() {
   const pathname = useLocation({ select: (location) => location.pathname })
@@ -28,7 +28,11 @@ function NavigationLifecycle() {
         connection?: { saveData?: boolean; effectiveType?: string }
       }
     ).connection
-    if (connection?.saveData || connection?.effectiveType?.includes('2g'))
+    if (
+      window.matchMedia('(max-width: 767px)').matches ||
+      connection?.saveData ||
+      connection?.effectiveType?.includes('2g')
+    )
       return
     const timer = window.setTimeout(() => {
       void router.preloadRoute({ to: '/verdant/agenda' }).catch(() => undefined)

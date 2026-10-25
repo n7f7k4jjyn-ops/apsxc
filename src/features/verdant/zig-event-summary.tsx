@@ -9,7 +9,7 @@ type EventReport = {
   key: string; name: string; date: string; appEventId?: string | null; appEventName: string | null
   presentInHouse: number; registered: number | null; cameFromLists: number | null; conversionPercent: number | null; walkInsWithoutList: number | null
   lists: ListRow[]; salesAvailable: boolean
-  totalCents: number; barCents: number; couvertCents: number; entranceCents: number; refundedCents: number
+  consumptionCents?: number; totalCents: number; barCents: number; couvertCents: number; entranceCents: number; refundedCents: number
   excluded: { type: string; cents: number }[]
   avgTicketCents: number | null; avgBarCents: number | null; savedAt: string
 }
@@ -23,6 +23,7 @@ const dateLabel = (value: string) => value.split('-').reverse().join('/')
 export function ZigEventSummary({ from, to, eventId = '', eventIds }: { from: string; to: string; eventId?: string; eventIds?: string[] }) {
   const [reports, setReports] = useState<EventReport[] | null>(null)
   const [error, setError] = useState('')
+  const [staleReports, setStaleReports] = useState(0)
   const [query, setQuery] = useState('')
   const [sortKey, setSortKey] = useState<keyof EventReport | 'entrance'>('date')
   const [direction, setDirection] = useState<SortDirection>('asc')
@@ -32,9 +33,9 @@ export function ZigEventSummary({ from, to, eventId = '', eventIds }: { from: st
     let active = true
     fetch('/api/finance/zig-reports', { credentials: 'same-origin', cache: 'no-store' })
       .then(async (response) => {
-        const body = (await response.json().catch(() => ({}))) as { reports?: EventReport[]; error?: string }
+        const body = (await response.json().catch(() => ({}))) as { reports?: EventReport[]; staleReports?: number; error?: string }
         if (!response.ok) throw new Error(body.error || 'Não foi possível carregar o resumo.')
-        if (active) setReports(body.reports ?? [])
+        if (active) { setReports(body.reports ?? []); setStaleReports(body.staleReports ?? 0) }
       })
       .catch((failure: unknown) => { if (active) setError(failure instanceof Error ? failure.message : 'Falha ao carregar o resumo.') })
     return () => { active = false }
@@ -55,6 +56,8 @@ export function ZigEventSummary({ from, to, eventId = '', eventIds }: { from: st
       bar: visible.reduce((sum, item) => sum + item.barCents, 0),
       entrance: visible.reduce((sum, item) => sum + item.entranceCents + item.couvertCents, 0),
       withoutLists: visible.length - withLists.length,
+      billingCount: visible.filter(item => item.salesAvailable).length,
+      missingBilling: visible.filter(item => !item.salesAvailable).length,
     }
   }, [visible])
 
@@ -64,11 +67,11 @@ export function ZigEventSummary({ from, to, eventId = '', eventIds }: { from: st
   if (!reports) return <p role='status'>Carregando resumo…</p>
 
   const cards: [string, string][] = [
-    ['Pessoas que entraram na casa', num(totals.house)],
+    ['Público estimado por check-ins', num(totals.house)],
     ['Inscritos nas listas', num(totals.registered)],
     ['Entraram pela lista', num(totals.came)],
     ['Conversão das listas', pct(totals.conversion)],
-    ['Valor total do período', money(totals.total)],
+    ['Faturamento por pagamentos', money(totals.billingCount ? totals.total : null)],
     ['Ticket médio por pessoa', money(totals.ticket)],
     ['Bar e consumo', money(totals.bar)],
     ['Couvert e ingressos', money(totals.entrance)],
@@ -77,9 +80,10 @@ export function ZigEventSummary({ from, to, eventId = '', eventIds }: { from: st
   return (
     <div>
       <p>
-        Resumos salvos da Zig e das listas. Eventos antigos sem evento criado no app aparecem com público e receita da Zig; inscritos e conversão ficam com “—”, pois não há lista para cruzar. Ticket médio = receita (bar, couvert e ingressos) ÷ pessoas na casa; recargas, gorjetas e estornos ficam fora.
+        Resumos salvos da Zig e das listas. Eventos antigos sem evento criado no app aparecem com público e receita da Zig; inscritos e conversão ficam com “—”, pois não há lista para cruzar. Faturamento vem de /erp/faturamento; consumo de bar e ingressos vem de saída de produtos e não é somado ao faturamento. Ticket médio = faturamento ÷ check-ins associados por horário; a associação de presença é provisória. Não equivale ao repasse bancário líquido.
       </p>
       <p>Período: {from ? dateLabel(from) : 'início'} a {to ? dateLabel(to) : 'hoje'} (filtro “Período e evento” acima, o mesmo da aba Lista).</p>
+      {staleReports > 0 && <p role='status'>{staleReports} resumo(s) anterior(es) precisam ser consultados novamente para usar faturamento e presença corrigidos.</p>}
       {!visible.length && <p>Nenhum resumo salvo para os filtros selecionados.</p>}
       {visible.length > 0 && (
         <>
@@ -88,6 +92,7 @@ export function ZigEventSummary({ from, to, eventId = '', eventIds }: { from: st
               <div className='finance-panel' key={label}><h3>{label}</h3><strong><FitValue value={String(value)} maxSize={22} /></strong></div>
             ))}
           </div>
+          {totals.missingBilling > 0 && <p>{totals.missingBilling} evento(s) sem faturamento retornado. O total financeiro exibido é parcial; não foi tratado como zero confirmado.</p>}
           {totals.withoutLists > 0 && <p>{totals.withoutLists} evento(s) sem evento no app: ficam fora de inscritos e conversão.</p>}
           <div className='verdant-column-filter-bar'><ColumnFilterControl label='Evento / data' value={query} onChange={setQuery} /></div>
           <div className='finance-table'>

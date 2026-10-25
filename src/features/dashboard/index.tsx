@@ -1,4 +1,6 @@
 import {
+  lazy,
+  Suspense,
   useCallback,
   useEffect,
   useMemo,
@@ -14,15 +16,6 @@ import {
   RefreshCw,
   UsersRound,
 } from 'lucide-react'
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts'
 import { useAuthStore } from '@/stores/auth-store'
 import { trackNavigation } from '@/lib/analytics'
 import { LocalizedText, useLanguage } from '@/context/language-provider'
@@ -50,8 +43,8 @@ import { eventOptions } from '@/features/verdant/event-options'
 import { MonthFilter } from '@/features/verdant/month-filter'
 import { monthRange } from '@/features/verdant/month-range'
 import { useVerdantStore } from '@/features/verdant/store'
-import { FinancialSummary } from './financial-summary'
 import './mobile.css'
+import { RegistrationChart } from './registration-chart'
 import { SummaryDetail } from './summary-detail'
 import {
   buildWorkflow,
@@ -60,6 +53,12 @@ import {
   type Period,
   type DateRange,
 } from './workflow'
+
+const FinancialSummary = lazy(() =>
+  import('./financial-summary').then((module) => ({
+    default: module.FinancialSummary,
+  }))
+)
 
 const slug: Record<FormKey, string> = {
   DJS: 'djs',
@@ -163,6 +162,7 @@ export function Dashboard() {
           <label className='grid min-w-0 flex-1 gap-1 text-sm'>
             Evento em foco
             <select
+              aria-label='Evento em foco'
               className='h-11 rounded-md border bg-background px-3'
               value={focusId}
               onChange={(e) => setFocusId(e.target.value)}
@@ -289,13 +289,15 @@ export function Dashboard() {
       </>
     )
   return admin && summary === 'finance' ? (
-    <FinancialSummary
-      summarySwitch={summarySwitch}
-      period={period}
-      focusId={focusId}
-      now={now}
-      range={range}
-    />
+    <Suspense fallback={<PageLoading />}>
+      <FinancialSummary
+        summarySwitch={summarySwitch}
+        period={period}
+        focusId={focusId}
+        now={now}
+        range={range}
+      />
+    </Suspense>
   ) : (
     <OperationsDashboard
       summarySwitch={summarySwitch}
@@ -678,41 +680,10 @@ function OperationsDashboard({
                       {workflow.received} {translate('inscrições')}
                     </p>
                     {workflow.received > 0 && (
-                      <div className='h-40 min-w-0 sm:h-[200px]'>
-                        <ResponsiveContainer width='100%' height='100%'>
-                          <BarChart
-                            data={workflow.buckets}
-                            margin={{ left: -20, right: 8, bottom: 0 }}
-                          >
-                            <CartesianGrid
-                              vertical={false}
-                              strokeDasharray='3 3'
-                            />
-                            <XAxis
-                              dataKey='name'
-                              fontSize={10}
-                              minTickGap={16}
-                              tickLine={false}
-                            />
-                            <YAxis
-                              allowDecimals={false}
-                              fontSize={10}
-                              tickLine={false}
-                            />
-                            <Tooltip
-                              formatter={(value) => [
-                                value,
-                                translate('Inscrições'),
-                              ]}
-                            />
-                            <Bar
-                              dataKey='total'
-                              fill='var(--primary)'
-                              radius={[4, 4, 0, 0]}
-                            />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </div>
+                      <RegistrationChart
+                        buckets={workflow.buckets}
+                        label={translate('Inscrições')}
+                      />
                     )}
                     {workflow.received === 0 && (
                       <p className='text-xs text-muted-foreground'>

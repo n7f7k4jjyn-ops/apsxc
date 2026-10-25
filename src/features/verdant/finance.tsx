@@ -722,6 +722,7 @@ function AdminFinance() {
         </p>
       </Card>
       </details>
+      {data?.entries.some(entry => entry.externalId?.startsWith('zig:sales:') && entry.status !== 'cancelled') && <p role='alert' className='finance-warning'>Existem importações antigas da Zig por consumo. Revise esses lançamentos antes de conciliar o faturamento corrigido. Nenhum registro foi substituído automaticamente.</p>}
       {report && <nav className='finance-compact-summary' aria-label='Indicadores financeiros'>{[['Recebido',report.incoming],['Pago',report.outgoing],['Saldo',report.balance],['A pagar',report.payable],['A receber',report.receivable]].map(([label,value])=><button type='button' key={label} onClick={()=>{setSearch('');setCategory('');if(label==='A pagar'||label==='A receber'){setType(label==='A pagar'?'payable':'receivable');setStatus('pending');setTab('ledger')}else{setType('');setStatus('');setTab('cash')}}}><span>{label}</span><strong><FitValue value={formatCents(Number(value))} maxSize={20} /></strong></button>)}</nav>}
       {report && (
         <details className='finance-period-details'><summary>Detalhar caixa registrado e pagamentos</summary><section aria-label='Resumo financeiro'>
