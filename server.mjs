@@ -17,6 +17,7 @@ import { migrateVerdantState } from './lib/verdant-state-migration.mjs'
 import { PUBLIC_FORM_META, personalizeFormShareHtml } from './lib/public-form-meta.mjs'
 import { emptyFinance, validateFinanceStore, changeFinance } from './lib/finance.mjs'
 import { confirmInfluencerAdmission, planInfluencerCommissions } from './lib/influencer-commissions.mjs'
+import { reconcileInfluencerCheckins } from './lib/zig-influencer-reconciliation.mjs'
 import { ZIG_BASE_URL, ZigError, createZigClient, validateToken as validZigToken } from './lib/zig-client.mjs'
 import { buildZigPreview, collectZigData, formatZigPreview, listZigEvents, matchZigData, validatePreviewPeriod } from './lib/zig-preview.mjs'
 import { planEventMerge } from './lib/event-merge.mjs'
@@ -2184,6 +2185,38 @@ const server = createServer(async (request, response) => {
       response.setHeader('Cache-Control', 'no-store')
       const route = url.pathname.slice('/api/admin/zig/'.length)
       try {
+        if (route === 'influencer/reconcile' && request.method === 'POST') {
+          const payload = await bodyJson(request, 8192)
+          const dtinicio = String(payload?.dtinicio || '')
+          const dtfim = String(payload?.dtfim || '')
+          const invalid = validatePreviewPeriod(dtinicio, dtfim)
+          if (invalid) return sendJson(response, 400, { error: invalid })
+          const eventLinks = payload?.eventLinks
+          if (!eventLinks || typeof eventLinks !== 'object' || Array.isArray(eventLinks) ||
+            Object.entries(eventLinks).length > 4 ||
+            Object.entries(eventLinks).some(([id, value]) => !/^[A-Za-z0-9_-]{1,128}$/.test(id) || typeof value !== 'string' || !value || value.length > 128)) {
+            return sendJson(response, 400, { error: 'Vincule explicitamente até quatro IDs de eventos Zig aos eventos Verdant.' })
+          }
+          if (payload.confirm !== undefined && typeof payload.confirm !== 'boolean') return sendJson(response, 400, { error: 'Confirmação inválida.' })
+          const { client, lojaId } = await zigContext({ needStore: true })
+          if (zigPreviewRunning) return sendJson(response, 409, { error: 'Já existe uma consulta Zig em andamento.' })
+          zigPreviewRunning = true
+          try {
+            const data = await collectZigData({ client, lojaId, dtinicio, dtfim })
+            const state = await readState()
+            const operations = await readOperations()
+            const planned = reconcileInfluencerCheckins(operations, state, data.zigPeople, eventLinks, zigUser.username)
+            if (!payload.confirm) return sendJson(response, 200, { dryRun: true, confirmed: planned.confirmed.length, pending: planned.pending, warnings: data.warnings })
+            const result = await changeOperations(async document => {
+              const current = reconcileInfluencerCheckins(document, await readState(), data.zigPeople, eventLinks, zigUser.username)
+              Object.assign(document, current.document)
+              return { confirmed: current.confirmed.length, pending: current.pending }
+            })
+            return sendJson(response, 200, { dryRun: false, ...result, warnings: data.warnings })
+          } finally {
+            zigPreviewRunning = false
+          }
+        }
         if (route === 'config' && request.method === 'GET') {
           return sendJson(response, 200, { settings: zigSettingsForAdmin(await readJsonFile(integrationsPath, {})) })
         }

@@ -23,3 +23,15 @@ test('filters use event date even when entry was confirmed after midnight; rejec
   data.entries.push({ ...entry('one', 'settled'), amountCents: 600 })
   assert.throws(() => influencerPayoutRows(data, source), /diverge/)
 })
+
+test('historical influencer signup remains visible without finance event, but generates no commission', () => {
+  const data = { ...finance(), events: [] }
+  const source = { registrations: [{ id: 'historical', eventId: 'old-event', eventDate: '2026-07-18', eventName: 'Festa histórica', influencerId: 'person' }], admissions: [] }
+  const rows = influencerPayoutRows(data, source, { from: '2026-07-01', to: '2026-07-31' })
+  assert.equal(rows.length, 1)
+  assert.equal(rows[0].event, 'Festa histórica')
+  assert.equal(rows[0].date, '2026-07-18')
+  assert.equal(rows[0].registered, 1)
+  assert.equal(rows[0].validated, 0)
+  assert.equal(rows[0].earned, 0)
+})

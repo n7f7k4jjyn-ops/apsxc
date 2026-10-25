@@ -350,16 +350,17 @@ test('event workflow and touch navigation across desktop, tablet and mobile', { 
       }
 
     }
-    await page.route('**/api/finance', route => route.fulfill({ json: { events: [{ id: event.id, date: event.date, name: 'EventoComNomeMuitoLongoSemEspaçosParaConferirQuebraDeTexto • Festa de teste no relatório' }], beneficiaries: [{ id: 'influencer:qa-person', name: 'InfluencerComNomeMuitoLongoSemEspaçosParaConferirLegibilidade' }], entries: [] } }))
-    await page.route('**/api/finance/influencer-admissions', route => route.fulfill({ json: { registrations: [{ id: 'qa-reg', eventId: event.id, influencerId: 'qa-person' }], admissions: [] } }))
-    await page.goto(`${base}/verdant/exportacoes?month=2026-10&event=${event.id}`)
-    await expect(page.getByLabel('Mês', { exact: true })).toHaveValue('2026-10')
-    await page.getByRole('combobox', { name: 'Evento dos relatórios', exact: true }).selectOption(event.id)
+    await page.route('**/api/finance', route => route.fulfill({ json: { events: [{ id: other.id, date: other.date, name: 'EventoComNomeMuitoLongoSemEspaçosParaConferirQuebraDeTexto • Festa de teste no relatório' }], beneficiaries: [{ id: 'influencer:qa-person', name: 'InfluencerComNomeMuitoLongoSemEspaçosParaConferirLegibilidade' }], entries: [] } }))
+    await page.route('**/api/finance/influencer-admissions', route => route.fulfill({ json: { registrations: [{ id: 'qa-reg', eventId: other.id, eventDate: '2026-09-10', eventName: other.name, influencerId: 'qa-person' }], admissions: [] } }))
+    await page.goto(`${base}/verdant/exportacoes?month=2026-09&event=${other.id}`)
+    await expect(page.getByLabel('Mês', { exact: true })).toHaveValue('2026-09')
+    await expect(page.getByRole('combobox', { name: 'Evento dos relatórios', exact: true })).toHaveValue(other.id)
     await page.getByRole('button', { name: 'Abrir Influencers', exact: true }).click()
     const influencerDialog = page.getByRole('dialog', { name: 'Influencers', exact: true })
     await influencerDialog.getByRole('button', { name: 'Gerar relatório de repasse de influencers', exact: true }).click()
     await expect(influencerDialog.getByRole('alert')).toHaveCount(0)
-    await expect(influencerDialog.locator('.verdant-influencer-payout-table tbody tr'), `Influencer report diagnostic: ${await influencerDialog.textContent()}`).toHaveCount(1)
+    const payoutRows = influencerDialog.locator('.verdant-influencer-payout-table tbody tr')
+    await expect(payoutRows, `Influencer report diagnostic: ${await influencerDialog.textContent()}`).toHaveCount(1)
     for (const width of [320, 390, 1280]) {
       await page.setViewportSize({ width, height: 900 })
       const cells = influencerDialog.locator('.verdant-influencer-payout-table tbody td')
