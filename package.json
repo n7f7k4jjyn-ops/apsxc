@@ -22,7 +22,7 @@
     "test:coverage": "vitest run --coverage --browser.headless",
     "test:browser:install": "playwright install chromium --with-deps",
     "postinstall": "npm run build",
-    "test:production-import": "node --test lib/influencer-commissions.test.mjs tests/production-import.test.mjs tests/dj-line.test.mjs tests/influencer-payout-report.test.mjs"
+    "test:production-import": "node --test lib/influencer-commissions.test.mjs tests/production-import.test.mjs tests/dj-line.test.mjs tests/influencer-payout-report.test.mjs tests/zig-influencer-reconciliation.test.mjs"
   },
   "dependencies": {
     "@clerk/react": "^6.4.3",
