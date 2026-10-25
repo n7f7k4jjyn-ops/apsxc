@@ -1,7 +1,7 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @import './theme.css';
-[data-slot='button'].verdant-gradient-button {
+:is([data-slot='button'], [data-slot='popover-trigger']).verdant-gradient-button {
   border: 0;
   background: linear-gradient(105deg, #299bd7 0%, #7657cf 43%, #c94e9f 100%);
   color: #fff;
@@ -9,12 +9,12 @@
   transition: filter 160ms ease, box-shadow 160ms ease;
 }
 
-[data-slot='button'].verdant-gradient-button:hover:not(:disabled) {
+:is([data-slot='button'], [data-slot='popover-trigger']).verdant-gradient-button:hover:not(:disabled) {
   filter: brightness(1.08);
   box-shadow: 0 9px 26px rgb(155 79 197 / 30%);
 }
 
-[data-slot='button'].verdant-gradient-button:disabled {
+:is([data-slot='button'], [data-slot='popover-trigger']).verdant-gradient-button:disabled {
   opacity: .55;
 }
 
@@ -226,3 +226,9 @@
 }
 
 input[type='date'], input[type='month'], input[type='time'] { accent-color: var(--primary); }
+[data-slot='button'][data-selected-single='true'],
+[data-slot='button'][data-range-start='true'],
+[data-slot='button'][data-range-end='true'] {
+  background: linear-gradient(105deg, #299bd7 0%, #7657cf 43%, #c94e9f 100%);
+  color: #fff;
+}

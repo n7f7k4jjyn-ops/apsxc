@@ -163,6 +163,7 @@ export function Dashboard() {
           <label className='grid min-w-0 flex-1 gap-1 text-sm'>
             Evento em foco
             <select
+              aria-label='Evento em foco'
               className='h-11 rounded-md border bg-background px-3'
               value={focusId}
               onChange={(e) => setFocusId(e.target.value)}
