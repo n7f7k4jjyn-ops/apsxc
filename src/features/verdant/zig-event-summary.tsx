@@ -1,3 +1,4 @@
+import { FitValue } from '@/components/fit-value'
 import { SortableTableHeader, ColumnFilterControl } from './list-controls'
 import { sortRows, type SortDirection } from './data'
 import { useEffect, useMemo, useState } from 'react'
@@ -84,7 +85,7 @@ export function ZigEventSummary({ from, to, eventId = '', eventIds }: { from: st
         <>
           <div className='finance-summary'>
             {cards.map(([label, value]) => (
-              <div className='finance-panel' key={label}><h3>{label}</h3><strong>{value}</strong></div>
+              <div className='finance-panel' key={label}><h3>{label}</h3><strong><FitValue value={String(value)} maxSize={22} /></strong></div>
             ))}
           </div>
           {totals.withoutLists > 0 && <p>{totals.withoutLists} evento(s) sem evento no app: ficam fora de inscritos e conversão.</p>}

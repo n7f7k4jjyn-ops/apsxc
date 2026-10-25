@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import type { Roster } from './roster-types'
 
@@ -6,14 +6,24 @@ const key = (date: Date) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 export function RosterCalendar({
   rows,
+  month,
+  onMonthChange,
   selected,
   onSelect,
 }: {
   rows: Roster[]
+  month?: string
+  onMonthChange?: (month: string) => void
   selected: string
   onSelect: (date: string) => void
 }) {
-  const [anchor, setAnchor] = useState(() => new Date())
+  const [anchor, setAnchor] = useState(() => month ? new Date(`${month}-01T12:00:00`) : new Date())
+  // The external month picker can jump independently of the calendar arrows.
+  useEffect(() => {
+    if (!month) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setAnchor(current => key(current).startsWith(month) ? current : new Date(`${month}-01T12:00:00`))
+  }, [month])
   const [view, setView] = useState<'month' | 'week'>('month')
   const start = new Date(
     anchor.getFullYear(),
@@ -33,6 +43,7 @@ export function RosterCalendar({
       next.setMonth(next.getMonth() + delta)
     } else next.setDate(next.getDate() + delta * 7)
     setAnchor(next)
+    onMonthChange?.(key(next).slice(0, 7))
     onSelect('')
   }
   return (
@@ -62,6 +73,7 @@ export function RosterCalendar({
           variant='outline'
           onClick={() => {
             setAnchor(new Date())
+            onMonthChange?.(key(new Date()).slice(0, 7))
             onSelect('')
           }}
         >

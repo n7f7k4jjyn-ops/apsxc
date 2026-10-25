@@ -1,4 +1,8 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Search } from '@/components/search'
+import { ThemeSwitch } from '@/components/theme-switch'
+import { ProfileDropdown } from '@/components/profile-dropdown'
+import { FitValue } from '@/components/fit-value'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from '@tanstack/react-router'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
@@ -70,7 +74,7 @@ export function FinancialSummary({
       })
     return () => controller.abort()
   }, [refresh])
-  const result = useMemo(() => {
+  const result = (() => {
     if (!data || busy || !connected || (focusId !== 'all' && !eventId))
       return null
     try {
@@ -81,7 +85,7 @@ export function FinancialSummary({
     } catch (e) {
       return { report: null, error: (e as Error).message }
     }
-  }, [data, busy, connected, focusId, from, to, eventId])
+  })()
   const report = result?.report
   const previousTo = new Date(Date.parse(from + 'T12:00:00Z') - 86400000)
     .toISOString()
@@ -123,14 +127,11 @@ export function FinancialSummary({
     : []
   return (
     <>
-      <Header fixed>
-        <h1 className='text-lg font-semibold'>Resumo financeiro</h1>
-      </Header>
-      <Main className='space-y-4'>
-        {summarySwitch}
+      <Header fixed className='verdant-summary-header'><div className='min-w-0 flex-1'><Search /></div><div className='flex shrink-0 items-center gap-0.5'><ThemeSwitch /><ProfileDropdown /></div></Header>
+      <Main className='verdant-summary space-y-4'>
         <div className='flex flex-wrap items-center justify-between gap-3'>
           <div>
-            <h2 className='text-2xl font-bold'>Resumo financeiro</h2>
+            <h1 className='text-xl font-bold sm:text-2xl'>Resumo financeiro</h1>
             <p className='text-sm text-muted-foreground'>
               Valores dos lançamentos registrados. Saldo registrado não equivale
               ao saldo bancário.
@@ -147,10 +148,8 @@ export function FinancialSummary({
             Atualizar financeiro
           </Button>
         </div>
-        <p className='text-sm text-muted-foreground'>
-          Recebimentos e pagamentos usam a data da baixa. Contas pendentes usam
-          o vencimento. Evento e período são os mesmos do resumo da operação.
-        </p>
+        {summarySwitch}
+        <details className='rounded-lg border p-3 text-sm text-muted-foreground'><summary className='min-h-11 cursor-pointer'>Como ler os valores</summary><p>Recebimentos e pagamentos usam a data da baixa. Contas pendentes usam o vencimento. Evento e período são os mesmos do resumo da operação.</p></details>
         {!connected && (
           <p role='alert'>
             Aguardando sincronização dos eventos. Nenhum total financeiro foi
@@ -167,9 +166,21 @@ export function FinancialSummary({
         {(error || result?.error) && (
           <p role='alert'>{error || result?.error}</p>
         )}
+        {report && ([['Receitas, despesas e pendências', figures.slice(0, 6)], ['Pagamentos por categoria', figures.slice(6)]] as const).map(([title, items]) => <section key={title} className='space-y-3'><h3 className='text-lg font-semibold'>{title}</h3><div className='grid grid-cols-2 gap-3 xl:grid-cols-3'>
+          {items.map(([label, value]) => (
+            <Card key={label}>
+              <CardHeader>
+                <CardTitle className='text-sm'>{label}</CardTitle>
+              </CardHeader>
+              <CardContent className='text-2xl font-bold'>
+                <FitValue value={formatCents(value)} maxSize={28} />
+              </CardContent>
+            </Card>
+          ))}
+</div></section>)}
         <h3 className='text-lg font-semibold'>Público e listas</h3>
         {connected && (
-          <div className='grid gap-3 sm:grid-cols-2'>
+          <div className='grid grid-cols-2 gap-3'>
             <Card>
               <CardHeader>
                 <CardTitle>
@@ -179,7 +190,7 @@ export function FinancialSummary({
                 </CardTitle>
               </CardHeader>
               <CardContent className='text-2xl font-semibold'>
-                {workflow.registrations.length}
+                <FitValue value={workflow.registrations.length.toLocaleString('pt-BR')} maxSize={28} />
               </CardContent>
             </Card>
             <Card>
@@ -187,23 +198,11 @@ export function FinancialSummary({
                 <CardTitle>Inscrições recebidas no período</CardTitle>
               </CardHeader>
               <CardContent className='text-2xl font-semibold'>
-                {workflow.received}
+                <FitValue value={workflow.received.toLocaleString('pt-BR')} maxSize={28} />
               </CardContent>
             </Card>
           </div>
         )}
-        {report && ([['Receitas, despesas e pendências', figures.slice(0, 6)], ['Pagamentos por categoria', figures.slice(6)]] as const).map(([title, items]) => <section key={title} className='space-y-3'><h3 className='text-lg font-semibold'>{title}</h3><div className='grid gap-3 sm:grid-cols-2 xl:grid-cols-3'>
-          {items.map(([label, value]) => (
-            <Card key={label}>
-              <CardHeader>
-                <CardTitle className='text-sm'>{label}</CardTitle>
-              </CardHeader>
-              <CardContent className='text-2xl font-bold'>
-                {formatCents(value)}
-              </CardContent>
-            </Card>
-          ))}
-</div></section>)}
         {report && previous && (
           <Card className='space-y-3 p-4'>
             <h3 className='text-lg font-semibold'>Comparação entre períodos</h3>

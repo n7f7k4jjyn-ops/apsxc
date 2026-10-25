@@ -1,3 +1,7 @@
+import { useIsMobile } from '@/hooks/use-mobile'
+import { MonthFilter } from '@/features/verdant/month-filter'
+import { monthRange } from '@/features/verdant/month-range'
+import { FitValue } from '@/components/fit-value'
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useAuthStore } from '@/stores/auth-store'
 import { FinancialSummary } from './financial-summary'
@@ -73,6 +77,8 @@ type ExtraSummary = {
 export function Dashboard() {
   const admin = useAuthStore(state => state.auth.user?.role.includes('admin'))
   const { data, initialize } = useVerdantStore()
+  const mobile = useIsMobile()
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
   const [summary, setSummary] = useState<'operation' | 'finance'>('operation')
   const [now, setNow] = useState(Date.now)
   useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 30000); return () => window.clearInterval(timer) }, [])
@@ -89,18 +95,20 @@ export function Dashboard() {
       <Button variant={summary === 'operation' ? 'default' : 'outline'} aria-pressed={summary === 'operation'} onClick={() => setSummary('operation')}>Resumo da operação</Button>
       {admin && <Button variant={summary === 'finance' ? 'default' : 'outline'} aria-pressed={summary === 'finance'} onClick={() => setSummary('finance')}>Resumo financeiro</Button>}
     </nav>
-    <div className='summary-filters flex flex-wrap items-end gap-3 rounded-xl border p-3'>
+    <details className='summary-filters rounded-xl border bg-card p-4' aria-label='Filtros do resumo' open={!mobile || mobileFiltersOpen} onToggle={event => { if (mobile) setMobileFiltersOpen(event.currentTarget.open) }}><summary className='flex min-h-11 cursor-pointer flex-wrap items-center justify-between gap-2'><h2 className='text-sm font-semibold'>Evento e período</h2><span className='text-xs text-muted-foreground'>{focusId === 'all' ? 'Todos os eventos' : focusId === 'next' ? 'Próximo evento' : data.events.find(event => event.id === focusId)?.name} · {rangeActive ? `${customRange.from} → ${customRange.to}` : { day: 'Hoje', week: 'Esta semana', month: 'Este mês' }[period]}</span></summary><div className='summary-main-filters mt-3'>
       <label className='grid min-w-0 flex-1 gap-1 text-sm'>Evento em foco<select className='h-11 rounded-md border bg-background px-3' value={focusId} onChange={e => setFocusId(e.target.value)}><option value='next'>Próximo evento</option><option value='all'>Todos os eventos</option>{[...data.events].sort((a, b) => a.date.localeCompare(b.date) || a.name.localeCompare(b.name)).map(event => <option key={event.id} value={event.id}>{event.date.split('-').reverse().join('/')} · {event.name}</option>)}</select></label>
+      <MonthFilter value={rangeActive && customRange.from.endsWith('-01') && monthRange(customRange.from.slice(0, 7)).to === customRange.to ? customRange.from.slice(0, 7) : ''} onChange={value => { if (!value) { setRangeActive(false); return }; setCustomRange(monthRange(value)); setRangeActive(true); setFocusId('all') }} />
       <div><p className='mb-1 text-sm'>Período</p><div className='flex gap-1'>{(['day', 'week', 'month'] as const).map(value => <Button key={value} size='sm' variant={!rangeActive && period === value ? 'secondary' : 'ghost'} aria-pressed={!rangeActive && period === value} onClick={() => { setPeriod(value); setRangeActive(false) }}>{{day:'Hoje', week:'Esta semana', month:'Este mês'}[value]}</Button>)}</div></div>
+      </div><details className='summary-custom-period mt-3'><summary className='cursor-pointer text-sm text-muted-foreground'>Personalizar período</summary><div className='mt-3 grid gap-3 sm:grid-cols-2'>
       <label className='grid gap-1 text-sm'>Data inicial<input className='h-11 rounded-md border bg-background px-3' type='date' value={rangeActive ? customRange.from : periodKeys(now, period)[0]} onChange={e => { const value = e.target.value; setCustomRange(current => ({ from: value, to: rangeActive ? current.to : periodKeys(now, period)[periodKeys(now, period).length - 1] })); setRangeActive(true) }} /></label>
       <label className='grid gap-1 text-sm'>Data final<input className='h-11 rounded-md border bg-background px-3' type='date' value={rangeActive ? customRange.to : periodKeys(now, period)[periodKeys(now, period).length - 1]} onChange={e => { const value = e.target.value; setCustomRange(current => ({ from: rangeActive ? current.from : periodKeys(now, period)[0], to: value })); setRangeActive(true) }} /></label>
-    </div>
+    </div></details></details>
   </>
   if (rangeError) return <><Header fixed /><Main className='space-y-4'>{summarySwitch}<p role='alert'>{rangeError}</p></Main></>
-  return admin && summary === 'finance' ? <FinancialSummary summarySwitch={summarySwitch} period={period} focusId={focusId} now={now} range={range} /> : <OperationsDashboard summarySwitch={summarySwitch} period={period} focusId={focusId} range={range} />
+  return admin && summary === 'finance' ? <FinancialSummary summarySwitch={summarySwitch} period={period} focusId={focusId} now={now} range={range} /> : <OperationsDashboard summarySwitch={summarySwitch} period={period} focusId={focusId} range={range} onFocusEvent={setFocusId} />
 }
 
-function OperationsDashboard({ summarySwitch, period, focusId, range }: { summarySwitch: ReactNode; period: Period; focusId: string; range?: DateRange }) {
+function OperationsDashboard({ summarySwitch, period, focusId, range, onFocusEvent }: { summarySwitch: ReactNode; period: Period; focusId: string; range?: DateRange; onFocusEvent: (eventId: string) => void }) {
   const { translate } = useLanguage()
   const { data, ready, serverConnected, initialize, refresh } =
     useVerdantStore()
@@ -203,7 +211,6 @@ function OperationsDashboard({ summarySwitch, period, focusId, range }: { summar
         {!ready && <PageLoading />}
         {ready && !serverConnected && <PageError retry={() => void refreshAll()} />}
         {ready && serverConnected && data.events.length === 0 && <EmptyEvents />}
-        {summarySwitch}
         <div className='flex flex-wrap items-start justify-between gap-3'>
           <div>
             <h1 className='text-xl font-bold tracking-tight sm:text-2xl'>
@@ -238,6 +245,7 @@ function OperationsDashboard({ summarySwitch, period, focusId, range }: { summar
             </span>
           </Button>
         </div>
+        {summarySwitch}
         <div
           role='status'
           className={`rounded-lg border px-3 py-2 text-sm ${serverConnected ? 'text-muted-foreground' : 'border-amber-500/50 text-amber-700 dark:text-amber-300'}`}
@@ -250,7 +258,7 @@ function OperationsDashboard({ summarySwitch, period, focusId, range }: { summar
                   'Servidor desconectado. Os dados exibidos podem estar desatualizados.'
                 )}
         </div>
-        <div className='grid grid-cols-2 gap-3 xl:grid-cols-4'>
+        <div className='summary-kpis grid grid-cols-2 gap-3 xl:grid-cols-4' role='region' aria-label='Indicadores da operação'>
           {[
             {
               title: 'Inscrições no período',
@@ -302,8 +310,8 @@ function OperationsDashboard({ summarySwitch, period, focusId, range }: { summar
                 </span>
                 <Icon size={16} className='shrink-0' />
               </div>
-              <div className='my-1 text-2xl font-semibold tabular-nums sm:my-2 sm:text-3xl'>
-                {value}
+              <div className='my-1 min-w-0 font-semibold sm:my-2'>
+                <FitValue value={String(value)} maxSize={30} />
               </div>
               <p className='text-xs text-muted-foreground'>
                 <LocalizedText text={note} />
@@ -311,8 +319,28 @@ function OperationsDashboard({ summarySwitch, period, focusId, range }: { summar
             </a>
           ))}
         </div>
-        <div className='grid items-start gap-4 xl:grid-cols-[1.35fr_1fr]'>
-          <Card>
+        <nav
+          aria-label={translate('Atalhos da operação')}
+          className='summary-shortcuts grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6'
+        >
+          {[
+            { to: '/verdant/agenda', label: 'Agenda' },
+            { to: '/verdant/formularios', label: 'Formulários' },
+            { to: '/verdant/inscricoes', label: 'Clientes e inscrições' },
+            { to: '/verdant/djs', label: 'DJs' },
+            { to: '/verdant/influencers', label: 'Influencers' },
+            { to: '/verdant/exportacoes', label: 'Relatórios' },
+          ].map((item) => (
+            <Button asChild className='h-auto min-h-12 justify-between whitespace-normal text-start' key={item.to} size='sm' variant='outline'>
+              <a href={item.to}>
+                <LocalizedText text={item.label} /><ArrowUpRight size={14} className='shrink-0' aria-hidden='true' />
+              </a>
+            </Button>
+          ))}
+        </nav>
+        <div className='summary-desktop-columns grid gap-4 xl:grid-cols-[1.4fr_1fr]'>
+          <div className='contents xl:block xl:space-y-4'>
+<Card className='summary-event-card'>
             <CardHeader className='gap-2'>
               <div className='flex flex-wrap items-center justify-between gap-2'>
                 <CardTitle className='text-base'>
@@ -421,134 +449,13 @@ function OperationsDashboard({ summarySwitch, period, focusId, range }: { summar
                   )}
                 </>
               ) : (
-                <div className='rounded-lg border border-dashed p-5 text-sm text-muted-foreground'>
-                  <LocalizedText
-                    text={
-                      workflow.upcoming.length
-                        ? 'Escolha um evento no filtro para ver suas listas.'
-                        : 'Não há próximos eventos ativos. Cadastre a próxima programação na agenda.'
-                    }
-                  />
-                </div>
+                <section className='space-y-3' aria-label='Próximos eventos'>
+                  {workflow.upcoming.length ? workflow.upcoming.slice(0, 4).map(event => <button key={event.id} type='button' className='flex min-h-16 w-full items-center justify-between gap-3 rounded-lg border p-3 text-start hover:bg-muted/40' onClick={() => onFocusEvent(event.id)}><span className='min-w-0'><b className='block text-sm'>{event.name}</b><span className='text-xs text-muted-foreground'>{formatDate(event.date, { weekday: 'short', day: '2-digit', month: '2-digit' })} · {event.eventTime || 'Horário a definir'}</span></span><ArrowUpRight size={18} className='shrink-0' aria-hidden='true' /></button>) : <p className='rounded-lg border border-dashed p-5 text-sm text-muted-foreground'>Não há próximos eventos ativos. Cadastre a próxima programação na agenda.</p>}
+                </section>
               )}
             </CardContent>
           </Card>
-          <div className='space-y-4'>
-            <Card>
-              <CardHeader>
-                <CardTitle className='text-base'>
-                  <LocalizedText text='Prioridades da equipe' />
-                </CardTitle>
-                <CardDescription>
-                  <LocalizedText text='Prazos vencidos primeiro, depois tarefas com data e prioridade.' />
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {extraError ? (
-                  <p role='alert' className='text-sm text-destructive'>
-                    {translate(extraError)}
-                  </p>
-                ) : !extra ? (
-                  <p className='text-sm text-muted-foreground'>
-                    <LocalizedText text='Carregando tarefas…' />
-                  </p>
-                ) : !extra.tasks.items.length ? (
-                  <p className='text-sm text-muted-foreground'>
-                    <LocalizedText text='Nenhuma tarefa pendente.' />
-                  </p>
-                ) : (
-                  <ul className='space-y-3'>
-                    {extra.tasks.items.map((task) => (
-                      <li key={task.id}>
-                        <a
-                          href='/tasks'
-                          className='block rounded-md p-2 hover:bg-muted'
-                        >
-                          <p className='text-sm font-medium'>{task.title}</p>
-                          <p className='mt-1 text-xs text-muted-foreground'>
-                            {task.dueDate
-                              ? `${formatDate(task.dueDate, { day: '2-digit', month: '2-digit' })}${task.dueDate < workflow.today ? ` · ${translate('Prazo vencido')}` : ''}`
-                              : translate('Sem prazo')}{' '}
-                            ·{' '}
-                            {translate(
-                              {
-                                low: 'Baixa',
-                                medium: 'Média',
-                                high: 'Alta',
-                                critical: 'Crítica',
-                              }[task.priority] || task.priority
-                            )}
-                          </p>
-                        </a>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                <Button asChild className='mt-3' variant='outline' size='sm'>
-                  <Link to='/tasks'>
-                    <LocalizedText text='Abrir tarefas' />
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle className='text-base'>
-                  <LocalizedText text='Vagas e equipe' />
-                </CardTitle>
-                <CardDescription>
-                  <LocalizedText text='Cadastros recebidos para avaliação da gestão.' />
-                </CardDescription>
-              </CardHeader>
-              <CardContent className='space-y-2'>
-                <a
-                  className='flex items-center justify-between gap-2 rounded-lg border p-3 hover:bg-muted/40'
-                  href='/verdant/cadastros?category=candidates'
-                >
-                  <span className='text-sm'>
-                    <LocalizedText text='Candidaturas de trabalho' />
-                  </span>
-                  <b>{extra && !extraError ? extra.jobApplications : '—'}</b>
-                  <ArrowUpRight size={14} />
-                </a>
-                {extra && extra.teamRegistrations !== null && (
-                  <a
-                    className='flex items-center justify-between gap-2 rounded-lg border p-3 hover:bg-muted/40'
-                    href='/verdant/cadastros?category=team'
-                  >
-                    <span className='text-sm'>
-                      <LocalizedText text='Atualizações cadastrais da equipe' />
-                    </span>
-                    <b>
-                      {extra && !extraError ? extra.teamRegistrations : '—'}
-                    </b>
-                    <ArrowUpRight size={14} />
-                  </a>
-                )}
-                <div className='summary-public-links grid grid-cols-2 gap-2 pt-2 text-xs sm:flex sm:flex-wrap sm:gap-3'>
-                  <a
-                    href='/trabalhe-conosco'
-                    target='_blank'
-                    rel='noreferrer'
-                    className='underline'
-                  >
-                    <LocalizedText text='Formulário de vagas' />
-                  </a>
-                  <a
-                    href='/equipe'
-                    target='_blank'
-                    rel='noreferrer'
-                    className='underline'
-                  >
-                    <LocalizedText text='Formulário da equipe' />
-                  </a>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-        <div className='grid gap-4 xl:grid-cols-[1.35fr_1fr]'>
-          <Card>
+<Card className='summary-chart-card'>
             <CardHeader>
               <CardTitle className='text-base'>
                 <LocalizedText text='Ritmo de inscrições' />
@@ -608,7 +515,120 @@ function OperationsDashboard({ summarySwitch, period, focusId, range }: { summar
               )}
             </CardContent>
           </Card>
-          <Card>
+          </div>
+          <aside className='contents xl:block xl:space-y-4' aria-label='Equipe e atividade recente'>
+<Card className='summary-priorities-card'>
+              <CardHeader>
+                <CardTitle className='text-base'>
+                  <LocalizedText text='Prioridades da equipe' />
+                </CardTitle>
+                <CardDescription>
+                  <LocalizedText text='Prazos vencidos primeiro, depois tarefas com data e prioridade.' />
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {extraError ? (
+                  <p role='alert' className='text-sm text-destructive'>
+                    {translate(extraError)}
+                  </p>
+                ) : !extra ? (
+                  <p className='text-sm text-muted-foreground'>
+                    <LocalizedText text='Carregando tarefas…' />
+                  </p>
+                ) : !extra.tasks.items.length ? (
+                  <p className='text-sm text-muted-foreground'>
+                    <LocalizedText text='Nenhuma tarefa pendente.' />
+                  </p>
+                ) : (
+                  <ul className='space-y-3'>
+                    {extra.tasks.items.map((task) => (
+                      <li key={task.id}>
+                        <a
+                          href='/tasks'
+                          className='block rounded-md p-2 hover:bg-muted'
+                        >
+                          <p className='text-sm font-medium'>{task.title}</p>
+                          <p className='mt-1 text-xs text-muted-foreground'>
+                            {task.dueDate
+                              ? `${formatDate(task.dueDate, { day: '2-digit', month: '2-digit' })}${task.dueDate < workflow.today ? ` · ${translate('Prazo vencido')}` : ''}`
+                              : translate('Sem prazo')}{' '}
+                            ·{' '}
+                            {translate(
+                              {
+                                low: 'Baixa',
+                                medium: 'Média',
+                                high: 'Alta',
+                                critical: 'Crítica',
+                              }[task.priority] || task.priority
+                            )}
+                          </p>
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <Button asChild className='mt-3' variant='outline' size='sm'>
+                  <Link to='/tasks'>
+                    <LocalizedText text='Abrir tarefas' />
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
+<Card className='summary-team-card'>
+              <CardHeader>
+                <CardTitle className='text-base'>
+                  <LocalizedText text='Vagas e equipe' />
+                </CardTitle>
+                <CardDescription>
+                  <LocalizedText text='Cadastros recebidos para avaliação da gestão.' />
+                </CardDescription>
+              </CardHeader>
+              <CardContent className='space-y-2'>
+                <a
+                  className='flex items-center justify-between gap-2 rounded-lg border p-3 hover:bg-muted/40'
+                  href='/verdant/cadastros?category=candidates'
+                >
+                  <span className='text-sm'>
+                    <LocalizedText text='Candidaturas de trabalho' />
+                  </span>
+                  <b>{extra && !extraError ? extra.jobApplications : '—'}</b>
+                  <ArrowUpRight size={14} />
+                </a>
+                {extra && extra.teamRegistrations !== null && (
+                  <a
+                    className='flex items-center justify-between gap-2 rounded-lg border p-3 hover:bg-muted/40'
+                    href='/verdant/cadastros?category=team'
+                  >
+                    <span className='text-sm'>
+                      <LocalizedText text='Atualizações cadastrais da equipe' />
+                    </span>
+                    <b>
+                      {extra && !extraError ? extra.teamRegistrations : '—'}
+                    </b>
+                    <ArrowUpRight size={14} />
+                  </a>
+                )}
+                <div className='summary-public-links grid grid-cols-2 gap-2 pt-2 text-xs sm:flex sm:flex-wrap sm:gap-3'>
+                  <a
+                    href='/trabalhe-conosco'
+                    target='_blank'
+                    rel='noreferrer'
+                    className='underline'
+                  >
+                    <LocalizedText text='Formulário de vagas' />
+                  </a>
+                  <a
+                    href='/equipe'
+                    target='_blank'
+                    rel='noreferrer'
+                    className='underline'
+                  >
+                    <LocalizedText text='Formulário da equipe' />
+                  </a>
+                </div>
+              </CardContent>
+            </Card>
+<Card className='summary-recent-card'>
             <CardHeader>
               <CardTitle className='text-base'>
                 <LocalizedText text='Últimas inscrições' />
@@ -654,26 +674,9 @@ function OperationsDashboard({ summarySwitch, period, focusId, range }: { summar
               )}
             </CardContent>
           </Card>
+          </aside>
         </div>
-        <nav
-          aria-label={translate('Atalhos da operação')}
-          className='grid grid-cols-2 gap-2 sm:flex sm:flex-wrap'
-        >
-          {[
-            { to: '/verdant/agenda', label: 'Agenda' },
-            { to: '/verdant/formularios', label: 'Formulários' },
-            { to: '/verdant/inscricoes', label: 'Clientes e inscrições' },
-            { to: '/verdant/djs', label: 'DJs' },
-            { to: '/verdant/influencers', label: 'Influencers' },
-            { to: '/verdant/exportacoes', label: 'Relatórios' },
-          ].map((item) => (
-            <Button asChild key={item.to} size='sm' variant='outline'>
-              <a href={item.to}>
-                <LocalizedText text={item.label} />
-              </a>
-            </Button>
-          ))}
-        </nav>
+
       </Main>
     </>
   )

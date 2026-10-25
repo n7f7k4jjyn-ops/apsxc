@@ -1,3 +1,4 @@
+import { MonthFilter } from '@/features/verdant/month-filter'
 import { useEffect, useMemo, useState, type DragEvent, type FormEvent } from 'react'
 import {
   CalendarDays,
@@ -149,7 +150,7 @@ export function ContentPlanner() {
   const [items, setItems] = useState<ContentItem[]>([])
   const [loading, setLoading] = useState(true)
   const [view, setView] = useState<ViewMode>('month')
-  const [cursor, setCursor] = useState(new Date('2026-10-19T12:00:00-03:00'))
+  const [cursor, setCursor] = useState(() => new Date())
   const [editing, setEditing] = useState<ContentItem | null>(null)
   const [creating, setCreating] = useState(false)
 
@@ -279,8 +280,9 @@ export function ContentPlanner() {
         <section className='flex flex-col gap-3 rounded-2xl border bg-card p-3 sm:p-4 lg:flex-row lg:items-center lg:justify-between'>
           <div className='flex min-w-0 flex-wrap items-center gap-2'>
             <Button type='button' variant='outline' size='icon' onClick={() => moveCursor(-1)} aria-label='Anterior'><ChevronLeft size={16} /></Button>
-            <Button type='button' variant='outline' onClick={() => setCursor(new Date('2026-10-19T12:00:00-03:00'))}>Hoje</Button>
+            <Button type='button' variant='outline' onClick={() => setCursor(new Date())}>Hoje</Button>
             <Button type='button' variant='outline' size='icon' onClick={() => moveCursor(1)} aria-label='Próximo'><ChevronRight size={16} /></Button>
+            <MonthFilter clearable={false} value={`${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`} onChange={value => { if (value) { setCursor(new Date(`${value}-01T12:00:00`)); setView('month') } }} />
             <span className='ml-1 min-w-44 text-sm font-semibold'>{view === 'month' ? monthTitle(cursor) : 'Semana de ' + new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short' }).format(weekCells[0]?.date)}</span>
           </div>
           <div className='flex w-full min-w-0 flex-wrap items-center gap-2 lg:w-auto'>

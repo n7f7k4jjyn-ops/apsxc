@@ -149,6 +149,7 @@ describe('FinancePage', () => {
     await expect
       .element(screen.getByRole('button', { name: 'Novo lançamento' }))
       .toBeEnabled()
+    await userEvent.click(screen.getByText(/^Período:/))
     await userEvent.fill(screen.getByLabelText('Data inicial'), '2026-10-31')
     await userEvent.fill(screen.getByLabelText('Data final'), '2026-10-01')
     await expect
@@ -547,6 +548,7 @@ describe('FinancePage', () => {
     await expect
       .element(screen.getByRole('button', { name: 'Novo lançamento' }))
       .toBeEnabled()
+    await userEvent.click(screen.getByText(/^Período:/))
     await userEvent.fill(screen.getByLabelText('Data inicial'), '2026-10-01')
     await userEvent.fill(screen.getByLabelText('Data final'), '2026-10-31')
     await expect
@@ -570,6 +572,7 @@ describe('FinancePage', () => {
       return json({ revision: 2, entries: [entry], imported: 1, skipped: 0 })
     })
     const screen = await render(<FinancePage />)
+    await userEvent.click(screen.getByText('Importar dados · Produção, equipe e financeiro', { exact: true }))
     await expect
       .element(screen.getByRole('button', { name: 'Novo lançamento' }))
       .toBeEnabled()
@@ -642,6 +645,7 @@ describe('FinancePage', () => {
       })
     })
     const screen = await render(<FinancePage />)
+    await userEvent.click(screen.getByText('Importar dados · Produção, equipe e financeiro', { exact: true }))
     await expect
       .element(screen.getByRole('button', { name: 'Novo lançamento' }))
       .toBeEnabled()

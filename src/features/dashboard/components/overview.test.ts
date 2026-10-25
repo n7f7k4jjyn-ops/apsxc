@@ -39,6 +39,7 @@ describe('gráfico de inscrições por lista', () => {
       ['Lover', 0],
       ['VIP', 0],
       ['Aniversário', 0],
+      ['Entrada gratuita', 0],
     ])
   })
 
@@ -51,8 +52,21 @@ describe('gráfico de inscrições por lista', () => {
 
     const buckets = buildBuckets(registrations, [], new Date('2026-10-15T12:00:00-03:00'), 'day', 'lists')
 
-    expect(buckets).toHaveLength(5)
+    expect(buckets).toHaveLength(6)
     expect(buckets.find(({ name }) => name === 'DJs')?.total).toBe(1)
     expect(buckets.find(({ name }) => name === 'VIP')?.total).toBe(1)
   })
+  it('uses the Curitiba day and month at the UTC boundary', () => {
+    const rows = [
+      registration('VIP', '2026-09-30T23:50:00-03:00'),
+      registration('DJS', '2026-10-01T00:10:00-03:00'),
+    ]
+    const september = buildBuckets(rows, [], new Date('2026-10-01T01:00:00Z'), 'month', 'lists')
+    expect(september.find(row => row.name === 'VIP')?.total).toBe(1)
+    expect(september.find(row => row.name === 'DJs')?.total).toBe(0)
+    const octoberFirst = buildBuckets(rows, [], new Date('2026-10-01T03:15:00Z'), 'day', 'lists')
+    expect(octoberFirst.find(row => row.name === 'VIP')?.total).toBe(0)
+    expect(octoberFirst.find(row => row.name === 'DJs')?.total).toBe(1)
+  })
+
 })

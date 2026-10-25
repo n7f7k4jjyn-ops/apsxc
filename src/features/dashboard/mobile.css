@@ -50,3 +50,21 @@
     min-height: 44px;
   }
 }
+
+.summary-main-filters { display: grid; grid-template-columns: minmax(180px,1.5fr) minmax(150px,1fr) minmax(230px,1fr); align-items: end; gap: 16px; }
+.summary-main-filters > * { min-width: 0; }
+.summary-operational-grid > *, .summary-activity-grid > * { min-width: 0; }
+.summary-activity-grid > [data-slot=card] { height: 100%; }
+@media(max-width:1023px) { .summary-main-filters { grid-template-columns: repeat(2,minmax(0,1fr)); }.summary-main-filters > :last-child { grid-column: 1 / -1; } }
+@media(max-width:639px) { .summary-main-filters { grid-template-columns: 1fr; gap: 12px; }.summary-custom-period summary { min-height: 44px; display: flex; align-items: center; }.summary-shortcuts a { min-height: 48px; } }
+
+.summary-main-filters select,.summary-custom-period input { min-width: 0; width: 100%; max-width: 100%; }
+
+.summary-desktop-columns > * { min-width: 0; }
+@media(max-width:1279px) {
+  .summary-event-card { order: 1; }
+  .summary-priorities-card { order: 2; }
+  .summary-team-card { order: 3; }
+  .summary-chart-card { order: 4; }
+  .summary-recent-card { order: 5; }
+}

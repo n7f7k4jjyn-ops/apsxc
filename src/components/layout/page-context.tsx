@@ -9,6 +9,7 @@ export const PageContext = memo(function PageContext() {
   const { translate } = useLanguage()
   const page = getNavigationPage(pathname)
   const breadcrumbs = getBreadcrumbs(pathname)
+  if (page.path === '/') return null
 
   return (
     <div className='min-w-0 border-b px-3 py-2 sm:px-4'>

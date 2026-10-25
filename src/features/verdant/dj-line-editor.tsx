@@ -8,7 +8,11 @@ export function DjLineEditor({
   data,
   eventId,
   update,
+  embedded = false,
+  onDirtyChange,
 }: {
+  embedded?: boolean
+  onDirtyChange?: (dirty: boolean) => void
   data: VerdantState
   eventId: string
   update: (mutate: (state: VerdantState) => VerdantState) => Promise<boolean>
@@ -26,6 +30,7 @@ export function DjLineEditor({
   const [reviewed, setReviewed] = useState(false)
   const changed = rows.some((row) => row.id !== row.originalPersonId)
   function patch(originalId: string, fields: Partial<EditableRow>) {
+    onDirtyChange?.(true)
     setRows((current) =>
       current.map((row) =>
         row.originalId === originalId ? { ...row, ...fields } : row
@@ -50,6 +55,7 @@ export function DjLineEditor({
           throw new Error('A line mudou. Atualize o relatório antes de salvar.')
         return applyDjLine(state, eventId, rows)
       })
+      if (saved) onDirtyChange?.(false)
       setMessage(
         saved
           ? 'Line salva. Inscrições e pagamentos anteriores permanecem vinculados ao DJ original.'
@@ -64,11 +70,10 @@ export function DjLineEditor({
   const visible = rows.filter(
     (row) => !track || row.track.toUpperCase() === track
   )
+  const Container = embedded ? 'section' : 'details'
   return (
-    <details className='mb-4 rounded-lg border p-4'>
-      <summary className='cursor-pointer font-semibold'>
-        Organizar Line de DJs — pistas e horários
-      </summary>
+    <Container className='mb-4 rounded-lg border p-4'>
+      {embedded ? <h3 className='font-semibold'>Organizar line — pistas e horários</h3> : <summary className='cursor-pointer font-semibold'>Organizar Line de DJs — pistas e horários</summary>}
       <div className='my-3 flex flex-wrap gap-2'>
         {[
           ['', 'Todas as pistas'],
@@ -266,6 +271,6 @@ export function DjLineEditor({
           {message}
         </p>
       )}
-    </details>
+    </Container>
   )
 }

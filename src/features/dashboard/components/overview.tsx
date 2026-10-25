@@ -29,31 +29,36 @@ const monthName = (date: Date) =>
 const shortDate = (date: Date) =>
   new Intl.DateTimeFormat(getCurrentLanguage(), { day: '2-digit', month: 'short', timeZone: 'America/Sao_Paulo' }).format(date).replace('.', '')
 
+// Calendar arithmetic stays on the Curitiba date even when the viewer runs in UTC.
+function calendarDate(date: Date) {
+  return new Date(`${dateKey(date)}T12:00:00Z`)
+}
+
 function moveDate(date: Date, period: Period, amount: number) {
-  const next = new Date(date)
-  if (period === 'day') next.setDate(next.getDate() + amount)
-  else if (period === 'week') next.setDate(next.getDate() + amount * 7)
-  else next.setMonth(next.getMonth() + amount, 1)
+  const next = calendarDate(date)
+  if (period === 'day') next.setUTCDate(next.getUTCDate() + amount)
+  else if (period === 'week') next.setUTCDate(next.getUTCDate() + amount * 7)
+  else next.setUTCMonth(next.getUTCMonth() + amount, 1)
   return next
 }
 
 function periodStart(date: Date, period: Period) {
-  const start = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  const start = calendarDate(date)
   if (period === 'week') {
-    const offset = (start.getDay() + 6) % 7
-    start.setDate(start.getDate() - offset)
+    const offset = (start.getUTCDay() + 6) % 7
+    start.setUTCDate(start.getUTCDate() - offset)
   }
-  if (period === 'month') start.setDate(1)
+  if (period === 'month') start.setUTCDate(1)
   return start
 }
 
 function periodLabel(date: Date, period: Period) {
   const start = periodStart(date, period)
-  if (period === 'day') return new Intl.DateTimeFormat(getCurrentLanguage(), { dateStyle: 'long' }).format(start)
+  if (period === 'day') return new Intl.DateTimeFormat(getCurrentLanguage(), { dateStyle: 'long', timeZone: 'America/Sao_Paulo' }).format(start)
   if (period === 'month') return monthName(start)
   const end = new Date(start)
-  end.setDate(start.getDate() + 6)
-  return `${shortDate(start)} – ${shortDate(end)}${start.getMonth() === end.getMonth() ? ` ${start.getFullYear()}` : ` ${end.getFullYear()}`}`
+  end.setUTCDate(start.getUTCDate() + 6)
+  return `${shortDate(start)} – ${shortDate(end)}${start.getUTCMonth() === end.getUTCMonth() ? ` ${start.getUTCFullYear()}` : ` ${end.getUTCFullYear()}`}`
 }
 
 function periodBuckets(anchor: Date, period: Period, mode: ChartMode): { name: string; key?: string; hour?: number }[] {
@@ -62,10 +67,10 @@ function periodBuckets(anchor: Date, period: Period, mode: ChartMode): { name: s
     if (mode === 'agenda') return [{ name: 'Eventos' }]
     return Array.from({ length: 24 }, (_, hour) => ({ name: `${String(hour).padStart(2, '0')}h`, key: dateKey(start), hour }))
   }
-  const count = period === 'week' ? 7 : new Date(start.getFullYear(), start.getMonth() + 1, 0).getDate()
+  const count = period === 'week' ? 7 : new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 0)).getUTCDate()
   return Array.from({ length: count }, (_, index) => {
     const date = new Date(start)
-    date.setDate(start.getDate() + index)
+    date.setUTCDate(start.getUTCDate() + index)
     const weekday = new Intl.DateTimeFormat(getCurrentLanguage(), { weekday: 'short', timeZone: 'America/Sao_Paulo' }).format(date).replace('.', '')
     return { name: period === 'week' ? weekday : String(index + 1), key: dateKey(date) }
   })
