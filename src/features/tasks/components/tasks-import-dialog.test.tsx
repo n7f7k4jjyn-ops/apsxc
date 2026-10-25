@@ -60,7 +60,7 @@ describe('TasksImportDialog', () => {
     await userEvent.click(getByRole('button', { name: 'Importar' }))
 
     expect(mocks.toastError).not.toHaveBeenCalled()
-    expect(mocks.importTasks).toHaveBeenCalledOnce()
+    await vi.waitFor(() => expect(mocks.importTasks).toHaveBeenCalledOnce())
     expect(mocks.importTasks).toHaveBeenCalledWith([{
       title: 'Tarefa A',
       description: 'Descrição',

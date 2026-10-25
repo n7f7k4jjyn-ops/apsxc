@@ -78,7 +78,8 @@ test('event workflow and touch navigation across desktop, tablet and mobile', { 
     }
     assert.ok(ready, `Local server must start: ${logs}`)
     browser = await chromium.launch({ headless: true, ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH, args: ['--no-sandbox', '--disable-gpu'] } : {}) })
-    const context = await browser.newContext({ viewport: { width: 1280, height: 900 } })
+    // Mocked API fixtures must reach Playwright instead of the installed service worker.
+    const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, serviceWorkers: 'block' })
     assert.equal((await context.request.post(`${base}/api/auth/login`, {
       data: { username: 'qa-navigation', password },
     })).status(), 200)
@@ -300,7 +301,9 @@ test('event workflow and touch navigation across desktop, tablet and mobile', { 
 
     const summaryEventOptions = page.locator('.summary-main-filters select').first().locator('option')
     await expect(summaryEventOptions.filter({ hasText: other.name })).toHaveCount(0)
-    await page.getByRole('button', { name: 'Abrir calendário de mês', exact: true }).click()
+    const monthTrigger = page.getByRole('button', { name: 'Abrir calendário de mês', exact: true })
+    assert.ok((await monthTrigger.evaluate(element => getComputedStyle(element).backgroundImage)).includes('linear-gradient'), 'Calendar trigger must use the highlight gradient')
+    await monthTrigger.click()
     const monthCalendar = page.getByRole('dialog', { name: 'Calendário de mês', exact: true })
     await monthCalendar.getByRole('button', { name: 'set de 2026', exact: true }).click()
     await expect(page.getByLabel('Mês', { exact: true })).toHaveValue('2026-09')
