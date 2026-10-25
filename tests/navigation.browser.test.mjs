@@ -351,9 +351,11 @@ test('event workflow and touch navigation across desktop, tablet and mobile', { 
     await page.route('**/api/finance/influencer-admissions', route => route.fulfill({ json: { registrations: [{ id: 'qa-reg', eventId: event.id, influencerId: 'qa-person' }], admissions: [] } }))
     await page.goto(`${base}/verdant/exportacoes?month=2026-10&event=${event.id}`)
     await expect(page.getByLabel('Mês', { exact: true })).toHaveValue('2026-10')
+    await page.getByRole('combobox', { name: 'Evento dos relatórios', exact: true }).selectOption(event.id)
     await page.getByRole('button', { name: 'Abrir Influencers', exact: true }).click()
     const influencerDialog = page.getByRole('dialog', { name: 'Influencers', exact: true })
     await influencerDialog.getByRole('button', { name: 'Gerar relatório de repasse de influencers', exact: true }).click()
+    await expect(influencerDialog.getByRole('alert')).toHaveCount(0)
     await expect(influencerDialog.locator('.verdant-influencer-payout-table tbody tr')).toHaveCount(1)
     for (const width of [320, 390, 1280]) {
       await page.setViewportSize({ width, height: 900 })
