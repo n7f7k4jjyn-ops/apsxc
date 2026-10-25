@@ -36,6 +36,7 @@ test('event workflow and touch navigation across desktop, tablet and mobile', { 
   const data = JSON.parse(await readFile(path.join(root, 'src/features/verdant/seed.json'), 'utf8'))
   data.version = 7
   const [event, other] = data.events
+  event.date = '2026-10-24'
   other.date = '2026-09-10'
   data.registrations = [event, other].map((item, index) => ({
     id: `registration-${index}`,
@@ -64,6 +65,7 @@ test('event workflow and touch navigation across desktop, tablet and mobile', { 
   const capture = async name => {
     if (!page || !process.env.NAV_QA_ARTIFACT_DIR) return
     await mkdir(process.env.NAV_QA_ARTIFACT_DIR, { recursive: true })
+    await page.evaluate(() => window.scrollTo(0, 0))
     await page.waitForTimeout(200)
     await page.screenshot({ path: path.join(process.env.NAV_QA_ARTIFACT_DIR, `${name}.png`), fullPage: page.viewportSize().width >= 768 })
   }
@@ -118,6 +120,25 @@ test('event workflow and touch navigation across desktop, tablet and mobile', { 
     await expect(djDialog.getByText('Convidados dos DJs', { exact: true })).toBeVisible()
     await expect(djDialog.getByText('Organizar line — pistas e horários', { exact: true })).toBeVisible()
     await expect(djDialog.getByRole('button', { name: 'Gerar PDF de convidados', exact: true })).toBeVisible()
+    const eventChooser = djDialog.getByRole('combobox', { name: 'Evento dos DJs', exact: true })
+    await expect(eventChooser).toHaveValue(event.id)
+    const linkedDjs = data.people.filter(person => person.kind === 'DJ' && person.eventIds.includes(event.id))
+    for (const person of linkedDjs) await djDialog.getByLabel(`Pista de ${person.name}`, { exact: true }).selectOption('SKY')
+    const firstDj = linkedDjs[0]
+    await djDialog.getByLabel(`Primeiro horário de ${firstDj.name}`, { exact: true }).fill('23:00')
+    await djDialog.getByLabel(`Segundo horário de ${firstDj.name}`, { exact: true }).fill('03:00')
+    page.once('dialog', dialog => dialog.dismiss())
+    await eventChooser.selectOption('')
+    await expect(eventChooser).toHaveValue(event.id)
+    await expect(djDialog.getByLabel(`Segundo horário de ${firstDj.name}`, { exact: true })).toHaveValue('03:00')
+    await djDialog.getByRole('button', { name: 'Salvar line', exact: true }).click()
+    await expect.poll(async () => { const saved = await (await context.request.get(`${base}/api/state`)).json(); return saved.people.find(person => person.id === firstDj.id)?.eventDetails[event.id]?.secondTime }).toBe('03:00')
+    await eventChooser.selectOption('')
+    await expect(eventChooser).toHaveValue('')
+    await eventChooser.selectOption(event.id)
+    await expect(djDialog.getByLabel(`Primeiro horário de ${firstDj.name}`, { exact: true })).toHaveValue('23:00')
+    await expect(djDialog.getByLabel(`Segundo horário de ${firstDj.name}`, { exact: true })).toHaveValue('03:00')
+
     await page.keyboard.press('Escape')
     await expect(djDialog).toBeHidden()
     await expect(page.getByRole('button', { name: 'Abrir DJs', exact: true })).toBeFocused()
@@ -268,8 +289,24 @@ test('event workflow and touch navigation across desktop, tablet and mobile', { 
     await expect(page.getByRole('button', { name: 'Abrir Zig', exact: true })).toHaveCount(0)
     await page.goto(base)
     await expect(page.getByRole('region', { name: 'Indicadores da operação' })).toBeVisible()
-    await page.getByLabel('Mês', { exact: true }).fill('2026-09')
+    await page.getByLabel('Evento em foco', { exact: true }).selectOption(event.id)
+    await page.getByRole('button', { name: 'Ver listas do evento', exact: true }).click()
+    const eventLists = page.getByRole('dialog', { name: 'Listas do evento', exact: true })
+    await expect(eventLists).toBeVisible()
+    await expect(eventLists.getByRole('link', { name: /^Link público:/ })).toHaveCount(6)
+    await eventLists.getByRole('button', { name: 'Fechar', exact: true }).click()
+
+    const summaryEventOptions = page.getByLabel('Evento em foco', { exact: true }).locator('option')
+    await expect(summaryEventOptions.filter({ hasText: other.name })).toHaveCount(0)
+    await page.getByRole('button', { name: 'Abrir calendário de mês', exact: true }).click()
+    const monthCalendar = page.getByRole('dialog', { name: 'Calendário de mês', exact: true })
+    await monthCalendar.getByRole('button', { name: 'set de 2026', exact: true }).click()
+    await expect(page.getByLabel('Mês', { exact: true })).toHaveValue('2026-09')
+    await expect(summaryEventOptions.filter({ hasText: other.name })).toHaveCount(1)
     await page.getByText('Personalizar período', { exact: true }).click()
+    await page.getByRole('button', { name: 'Abrir calendário: Data inicial', exact: true }).click()
+    await expect(page.getByRole('dialog', { name: 'Calendário: Data inicial', exact: true })).toBeVisible()
+    await page.keyboard.press('Escape')
     await expect(page.getByLabel('Data inicial', { exact: true })).toHaveValue('2026-09-01')
     await expect(page.getByLabel('Data final', { exact: true })).toHaveValue('2026-09-30')
     await page.getByText('Personalizar período', { exact: true }).click()
@@ -308,6 +345,23 @@ test('event workflow and touch navigation across desktop, tablet and mobile', { 
       }
 
     }
+    await page.route('**/api/finance', route => route.fulfill({ json: { events: [{ id: event.id, date: event.date, name: 'EventoComNomeMuitoLongoSemEspaçosParaConferirQuebraDeTexto • Festa de teste no relatório' }], beneficiaries: [{ id: 'influencer:qa-person', name: 'InfluencerComNomeMuitoLongoSemEspaçosParaConferirLegibilidade' }], entries: [] } }))
+    await page.route('**/api/finance/influencer-admissions', route => route.fulfill({ json: { registrations: [{ id: 'qa-reg', eventId: event.id, influencerId: 'qa-person' }], admissions: [] } }))
+    await page.goto(`${base}/verdant/exportacoes?event=${event.id}`)
+    await page.getByRole('button', { name: 'Abrir Influencers', exact: true }).click()
+    const influencerDialog = page.getByRole('dialog', { name: 'Influencers', exact: true })
+    await influencerDialog.getByRole('button', { name: 'Gerar relatório de repasse de influencers', exact: true }).click()
+    await expect(influencerDialog.locator('.verdant-influencer-payout-table tbody tr')).toHaveCount(1)
+    for (const width of [320, 390, 1280]) {
+      await page.setViewportSize({ width, height: 900 })
+      const cells = influencerDialog.locator('.verdant-influencer-payout-table tbody td')
+      for (const cell of await cells.all()) assert.equal(await cell.evaluate(element => element.scrollWidth > element.clientWidth + 1), false, `Influencer cell must fit at ${width}px`)
+      const eventBox = await cells.nth(0).boundingBox(), personBox = await cells.nth(1).boundingBox()
+      assert.ok(width < 768 ? eventBox.y + eventBox.height <= personBox.y + 1 : eventBox.x + eventBox.width <= personBox.x + 1, 'Event title must not overlap influencer name')
+    }
+    await influencerDialog.getByRole('button', { name: 'Fechar', exact: true }).click()
+    await page.unroute('**/api/finance')
+    await page.unroute('**/api/finance/influencer-admissions')
     await page.goto(`${base}/verdant/conteudo`)
     await page.getByLabel('Mês', { exact: true }).fill('2026-09')
     await expect(page.getByText(/^setembro de 2026$/i)).toBeVisible()

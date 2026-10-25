@@ -37,6 +37,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { ConfigDrawer } from '@/components/config-drawer'
+import { FilterDateInput } from '@/components/filter-date-input'
 import { FitValue } from '@/components/fit-value'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
@@ -45,6 +46,7 @@ import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { formatDate, type FormKey } from '@/features/verdant/data'
+import { eventOptions } from '@/features/verdant/event-options'
 import { MonthFilter } from '@/features/verdant/month-filter'
 import { monthRange } from '@/features/verdant/month-range'
 import { useVerdantStore } from '@/features/verdant/store'
@@ -167,16 +169,15 @@ export function Dashboard() {
             >
               <option value='next'>Próximo evento</option>
               <option value='all'>Todos os eventos</option>
-              {[...data.events]
-                .sort(
-                  (a, b) =>
-                    a.date.localeCompare(b.date) || a.name.localeCompare(b.name)
-                )
-                .map((event) => (
-                  <option key={event.id} value={event.id}>
-                    {event.date.split('-').reverse().join('/')} · {event.name}
-                  </option>
-                ))}
+              {eventOptions(
+                data.events,
+                rangeActive ? customRange.from.slice(0, 7) : '',
+                focusId
+              ).map((event) => (
+                <option key={event.id} value={event.id}>
+                  {event.date.split('-').reverse().join('/')} · {event.name}
+                </option>
+              ))}
             </select>
           </label>
           <MonthFilter
@@ -230,14 +231,13 @@ export function Dashboard() {
           <div className='mt-3 grid gap-3 sm:grid-cols-2'>
             <label className='grid gap-1 text-sm'>
               Data inicial
-              <input
+              <FilterDateInput
                 className='h-11 rounded-md border bg-background px-3'
-                type='date'
+                label='Data inicial'
                 value={
                   rangeActive ? customRange.from : periodKeys(now, period)[0]
                 }
-                onChange={(e) => {
-                  const value = e.target.value
+                onValueChange={(value) => {
                   setCustomRange((current) => ({
                     from: value,
                     to: rangeActive
@@ -252,9 +252,9 @@ export function Dashboard() {
             </label>
             <label className='grid gap-1 text-sm'>
               Data final
-              <input
+              <FilterDateInput
                 className='h-11 rounded-md border bg-background px-3'
-                type='date'
+                label='Data final'
                 value={
                   rangeActive
                     ? customRange.to
@@ -262,8 +262,7 @@ export function Dashboard() {
                         periodKeys(now, period).length - 1
                       ]
                 }
-                onChange={(e) => {
-                  const value = e.target.value
+                onValueChange={(value) => {
                   setCustomRange((current) => ({
                     from: rangeActive
                       ? current.from
@@ -678,41 +677,43 @@ function OperationsDashboard({
                     <p className='mb-3 text-sm font-medium'>
                       {workflow.received} {translate('inscrições')}
                     </p>
-                    <div className='h-48 min-w-0 sm:h-[230px]'>
-                      <ResponsiveContainer width='100%' height='100%'>
-                        <BarChart
-                          data={workflow.buckets}
-                          margin={{ left: -20, right: 8, bottom: 0 }}
-                        >
-                          <CartesianGrid
-                            vertical={false}
-                            strokeDasharray='3 3'
-                          />
-                          <XAxis
-                            dataKey='name'
-                            fontSize={10}
-                            minTickGap={16}
-                            tickLine={false}
-                          />
-                          <YAxis
-                            allowDecimals={false}
-                            fontSize={10}
-                            tickLine={false}
-                          />
-                          <Tooltip
-                            formatter={(value) => [
-                              value,
-                              translate('Inscrições'),
-                            ]}
-                          />
-                          <Bar
-                            dataKey='total'
-                            fill='var(--primary)'
-                            radius={[4, 4, 0, 0]}
-                          />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
+                    {workflow.received > 0 && (
+                      <div className='h-40 min-w-0 sm:h-[200px]'>
+                        <ResponsiveContainer width='100%' height='100%'>
+                          <BarChart
+                            data={workflow.buckets}
+                            margin={{ left: -20, right: 8, bottom: 0 }}
+                          >
+                            <CartesianGrid
+                              vertical={false}
+                              strokeDasharray='3 3'
+                            />
+                            <XAxis
+                              dataKey='name'
+                              fontSize={10}
+                              minTickGap={16}
+                              tickLine={false}
+                            />
+                            <YAxis
+                              allowDecimals={false}
+                              fontSize={10}
+                              tickLine={false}
+                            />
+                            <Tooltip
+                              formatter={(value) => [
+                                value,
+                                translate('Inscrições'),
+                              ]}
+                            />
+                            <Bar
+                              dataKey='total'
+                              fill='var(--primary)'
+                              radius={[4, 4, 0, 0]}
+                            />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    )}
                     {workflow.received === 0 && (
                       <p className='text-xs text-muted-foreground'>
                         <LocalizedText text='Nenhuma inscrição recebida neste período.' />
@@ -755,7 +756,7 @@ function OperationsDashboard({
                     ))}
                   </ul>
                 )}
-                {extra && !extraError && (
+                {extra && !extraError && extra.tasks.pending > 0 && (
                   <p className='mb-3 text-sm text-muted-foreground'>
                     {extra.tasks.pending} tarefas pendentes ·{' '}
                     {extra.tasks.overdue} vencidas · todos os períodos

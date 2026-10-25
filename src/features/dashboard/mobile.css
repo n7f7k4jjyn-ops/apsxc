@@ -103,30 +103,15 @@
 .summary-desktop-columns > * {
   min-width: 0;
 }
-@media (max-width: 1279px) {
-  .summary-event-card {
-    order: 1;
-  }
-  .summary-priorities-card {
-    order: 2;
-  }
-  .summary-team-card {
-    order: 3;
-  }
-  .summary-chart-card {
-    order: 4;
-  }
-  .summary-recent-card {
-    order: 5;
-  }
-}
-
 @media (max-width: 359px) {
   .verdant-summary .summary-finance-kpis {
     grid-template-columns: minmax(0, 1fr);
   }
 }
 @media (max-width: 1279px) {
+  .summary-event-card {
+    order: 1;
+  }
   .summary-kpis {
     order: 2;
   }

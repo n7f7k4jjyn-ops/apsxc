@@ -1,3 +1,4 @@
+import { eventOptions } from './event-options'
 import { MonthFilter } from './month-filter'
 import { useEffect, useRef, useState } from 'react'
 import { useAuthStore } from '@/stores/auth-store'
@@ -316,7 +317,7 @@ export function RostersPage({
                 onChange={(e) => setEventFilter(e.target.value)}
               >
                 <option value=''>Todos os eventos</option>
-                {data.events.map((event) => (
+                {eventOptions(data.events, month, eventFilter).map((event) => (
                   <option key={event.id} value={event.id}>
                     {event.name} · {displayDate(event.date)}
                   </option>

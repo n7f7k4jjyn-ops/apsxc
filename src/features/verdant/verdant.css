@@ -562,3 +562,26 @@
 .verdant-column-filter-bar { align-items: flex-end; }
 .verdant-column-filter-bar > .verdant-month-filter { flex: 0 1 200px; }
 @media(max-width:767px) { .verdant-column-filter-bar > .verdant-month-filter { flex-basis: 100%; } }
+
+/* Keep long event titles and professional names inside their own fields. */
+.verdant-link-row > *, .verdant-link-fields > *, .verdant-link-check,
+.verdant-link-check > span, .verdant-person-primary { min-width: 0; }
+.verdant-link-check > input { flex-shrink: 0; }
+.verdant-link-check > span { flex: 1; }
+.verdant-link-check b, .verdant-link-check small {
+  white-space: normal; overflow-wrap: anywhere; line-height: 1.45;
+}
+.verdant-person-primary { display: flex; align-items: center; gap: 8px; }
+.verdant-person-avatar { flex-shrink: 0; }
+.verdant-link-fields input { min-width: 0; width: 100%; }
+.verdant-professional-option .verdant-link-fields { grid-template-columns: repeat(2,minmax(0,1fr)); }
+.verdant-influencer-payout-table { table-layout: fixed; width: 100%; min-width: 900px; }
+.verdant-influencer-payout-table th:first-child { width: 24%; }
+.verdant-influencer-payout-table th:nth-child(2) { width: 19%; }
+.verdant-influencer-payout-table td { white-space: normal; overflow-wrap: anywhere; }
+.verdant-payout-event { display: grid; min-width: 0; gap: 4px; }
+@media(max-width:767px) {
+  .verdant-link-row { grid-template-columns: minmax(0,1fr); align-items: start; }
+  .verdant-influencer-payout-table { min-width: 0; table-layout: auto; }
+  .verdant-influencer-payout-table td > span { min-width: 0; }
+}

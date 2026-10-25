@@ -1,3 +1,4 @@
+import { eventOptions } from './event-options'
 import { useOperationMonth } from './use-operation-month'
 import { FitValue } from '@/components/fit-value'
 import { MonthFilter } from './month-filter'
@@ -795,7 +796,8 @@ function EventFormConfigDraftCard({
                         <label className='verdant-link-check'><input type='checkbox' checked={checked} onChange={(event) => onProfessionalToggle(person, event.target.checked)} /><span><b>{person.name}</b><small>{person.phone || person.instagram || 'Cadastro ativo'}</small></span></label>
                         {checked && <div className='verdant-link-fields'>
                           {professionalKind === 'DJ' && <label className='verdant-field'><LocalizedText text={"Pista"} /><input value={details.track} onChange={(event) => onProfessionalDetailsChange(person.id, { ...details, track: event.target.value })} placeholder='Pista / ambiente' /></label>}
-                          <label className='verdant-field'><LocalizedText text={"Horário"} /><input type='time' value={details.time} onChange={(event) => onProfessionalDetailsChange(person.id, { ...details, time: event.target.value })} /></label>
+                          <label className='verdant-field'><LocalizedText text={professionalKind === 'DJ' ? "Primeiro horário" : "Horário"} /><input type='time' value={details.time} onChange={(event) => onProfessionalDetailsChange(person.id, { ...details, time: event.target.value })} /></label>
+                          {professionalKind === 'DJ' && <label className='verdant-field'>Segundo horário<input type='time' value={details.secondTime || ''} onChange={(event) => onProfessionalDetailsChange(person.id, { ...details, secondTime: event.target.value })} /></label>}
                           <label className='verdant-field'><LocalizedText text={"Ordem"} /><input type='number' min='1' value={details.order} onChange={(event) => onProfessionalDetailsChange(person.id, { ...details, order: Math.max(1, Number(event.target.value) || 1) })} /></label>
                         </div>}
                       </div>
@@ -905,7 +907,7 @@ function FormsPage({ data, update }: { data: VerdantState; update: (mutate: (sta
       <div className='verdant-filter-bar'><ListFilter size={17} /><select aria-label='Filtrar formulário' value={filter} onChange={(event) => setFilter(event.target.value as FormKey | 'TODOS')}><option value='TODOS'>{<LocalizedText text={"Todos os formulários"} />}</option>{FORM_DEFS.map((form) => <option key={form.key} value={form.key}><LocalizedText text={form.title} /></option>)}</select></div>
       <div className='verdant-form-card-grid'>
         {FORM_DEFS.filter((form) => filter === 'TODOS' || filter === form.key).map((definition) => {
-          const configs = data.forms.filter((form) => form.key === definition.key && (!month || eventById(data, form.eventId)?.date.startsWith(month))).sort((a, b) => (eventById(data, a.eventId)?.date ?? '').localeCompare(eventById(data, b.eventId)?.date ?? ''))
+          const configs = data.forms.filter((form) => form.key === definition.key && eventOptions(data.events, month).some(event => event.id === form.eventId)).sort((a, b) => (eventById(data, a.eventId)?.date ?? '').localeCompare(eventById(data, b.eventId)?.date ?? ''))
           const enabled = configs.filter((form) => form.enabled).length
           const registrations = sortRows((month ? data.registrations : visibleRegistrations(data)).filter((row) => row.formKey === definition.key && (!month || (eventById(data, row.eventId)?.date || row.eventDate).startsWith(month))), (row) => row.createdAt, 'desc').slice(0, 10)
           const registrationCount = (month ? data.registrations : visibleRegistrations(data)).filter((row) => row.formKey === definition.key && (!month || (eventById(data, row.eventId)?.date || row.eventDate).startsWith(month))).length
@@ -1195,7 +1197,7 @@ function ListsPage({ data, update }: { data: VerdantState; update: (mutate: (sta
         <CardContent className='pt-6'>
           <div className='verdant-column-filter-bar'>
             <MonthFilter value={month} onChange={value => { setMonth(value); setDate('') }} />
-            <ColumnFilterControl label='Evento' value={eventId} onChange={setEventId} options={[{value:'',label:'Todos os eventos'}, ...data.events.slice().sort((a,b)=>a.date.localeCompare(b.date)).map(event=>({value:event.id,label:`${compactDate(event.date)} · ${event.name}`}))]} />
+            <ColumnFilterControl label='Evento' value={eventId} onChange={setEventId} options={[{value:'',label:'Todos os eventos'}, ...eventOptions(data.events, month, eventId).map(event=>({value:event.id,label:`${compactDate(event.date)} · ${event.name}`}))]} />
             <ColumnFilterControl label='Data' value={date} onChange={setDate} inputType='date' />
             <ColumnFilterControl label='Lista' value={formKey} onChange={setFormKey} options={[{value:'',label:'Todas as listas'},...FORM_DEFS.map(form=>({value:form.key,label:form.title}))]} />
             <ColumnFilterControl label='Situação' value={status} onChange={value=>setStatus((value || 'all') as ListStatusFilter)} options={[{value:'all',label:'Todas as situações'},...Object.entries(statusLabel).map(([value,label])=>({value,label}))]} />
@@ -1291,7 +1293,7 @@ function RegistrationsPage({
           <div className='verdant-column-filter-bar'>
             <MonthFilter value={month} onChange={value => { setMonth(value); if (!standalone) setEventId(''); setFrom(''); setTo('') }} />
             <label className='verdant-search-field'><Search size={16} aria-hidden='true' /><span className='sr-only'><LocalizedText text='Buscar inscrições' /></span><input type='search' value={query} onChange={(event) => setQuery(event.target.value)} placeholder='Buscar nome, WhatsApp ou e-mail' /></label>
-            <ColumnFilterControl label='Evento' value={eventId} onChange={setEventId} options={[{value:'',label:'Todos os eventos'},...data.events.slice().sort((a,b)=>a.date.localeCompare(b.date)).map(event=>({value:event.id,label:`${compactDate(event.date)} · ${event.name}`}))]} />
+            <ColumnFilterControl label='Evento' value={eventId} onChange={setEventId} options={[{value:'',label:'Todos os eventos'},...eventOptions(data.events, month, eventId).map(event=>({value:event.id,label:`${compactDate(event.date)} · ${event.name}`}))]} />
             <ColumnFilterControl label='Lista' value={formKey} onChange={setFormKey} options={[{value:'',label:'Todas as listas'},...FORM_DEFS.map(form=>({value:form.key,label:form.title}))]} />
             <Button size='sm' variant='ghost' onClick={clearFilters}><LocalizedText text='Limpar filtros' /></Button>
           </div>
@@ -1603,10 +1605,11 @@ function HistoricalRegistrationImportPanel({
 type PeopleSortKey = 'name' | 'phone' | 'email' | 'social' | 'events' | 'active'
 
 function PeoplePage({ kind, data, update }: { kind: Person['kind']; data: VerdantState; update: (mutate: (state: VerdantState) => VerdantState) => Promise<boolean> }) {
+  const [peopleMonth, setPeopleMonth] = useState('')
   const [filters, setFilters] = useState({ name: '', phone: '', email: '', social: '', event: '', status: '' })
   const [sortKey, setSortKey] = useState<PeopleSortKey>('name')
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
-  const activeEvents = [...data.events].sort((a, b) => a.date.localeCompare(b.date))
+  const activeEvents = eventOptions(data.events, peopleMonth, filters.event)
   const allPeople = data.people.filter((person) => person.kind === kind)
   const filteredPeople = allPeople.filter((person) => {
     if (filters.name && !person.name.toLowerCase().includes(filters.name.toLowerCase())) return false
@@ -1654,6 +1657,7 @@ function PeoplePage({ kind, data, update }: { kind: Person['kind']; data: Verdan
         <CardContent><form className='verdant-new-person' onSubmit={addPerson}><label className='verdant-field'>{<LocalizedText text={"Nome ou nome artístico"} />}<input name='name' required maxLength={120} placeholder='Nome para exibição' /></label><label className='verdant-field'>{<LocalizedText text={"WhatsApp"} />}<input name='phone' type='tel' placeholder='Com DDD' /></label><label className='verdant-field'>{<LocalizedText text={"E-mail"} />}<input name='email' type='email' placeholder='contato@exemplo.com' /></label><label className='verdant-field'>{<LocalizedText text={"Instagram"} />}<input name='instagram' placeholder='@perfil' /></label><Button type='submit'><Plus size={15} />{<LocalizedText text={"Cadastrar"} leadingSpace />}</Button></form></CardContent>
       </Card>
       <div className='verdant-list-heading'><h2>{<LocalizedText text={"Profissionais cadastrados"} />}</h2><span>{people.length} {<LocalizedText text={"exibidos"} />}</span></div>
+      <MonthFilter value={peopleMonth} onChange={value => { setPeopleMonth(value); setFilters(current => ({ ...current, event: '' })) }} />
       <div className='verdant-column-filter-bar' aria-label={getCurrentLanguage() === 'en' ? 'Filter professionals by column' : 'Filtrar profissionais por coluna'}>
         <ColumnFilterControl label='Nome' placeholder={`Buscar ${singular.toLowerCase()}`} value={filters.name} onChange={(value) => setFilters((current) => ({ ...current, name: value }))} />
         <ColumnFilterControl label='WhatsApp' placeholder='Filtrar telefone' value={filters.phone} onChange={(value) => setFilters((current) => ({ ...current, phone: value }))} />
@@ -1672,7 +1676,7 @@ function PeoplePage({ kind, data, update }: { kind: Person['kind']; data: Verdan
             <SortButton label={<LocalizedText text='Eventos' />} active={sortKey === 'events'} direction={sortDirection} onClick={() => toggleSort('events')} />
             <SortButton label={<LocalizedText text='Status' />} active={sortKey === 'active'} direction={sortDirection} onClick={() => toggleSort('active')} />
           </div>
-          <div className='verdant-person-list'>{people.map((person) => <PersonEditor key={person.id} person={person} events={data.events} people={data.people} update={update} />)}</div>
+          <div className='verdant-person-list'>{people.map((person) => <PersonEditor eventMonth={peopleMonth} key={person.id} person={person} events={data.events} people={data.people} update={update} />)}</div>
         </div>
       </div>
       {!people.length && <div className='verdant-empty-state'>{<LocalizedText text={"Nenhum cadastro encontrado."} />}</div>}
@@ -1680,7 +1684,7 @@ function PeoplePage({ kind, data, update }: { kind: Person['kind']; data: Verdan
   )
 }
 
-function PersonEditor({ person, events, people, update }: { person: Person; events: VerdantEvent[]; people: Person[]; update: (mutate: (state: VerdantState) => VerdantState) => Promise<boolean> }) {
+function PersonEditor({ person, events, people, update, eventMonth = '' }: { eventMonth?: string; person: Person; events: VerdantEvent[]; people: Person[]; update: (mutate: (state: VerdantState) => VerdantState) => Promise<boolean> }) {
   const [active, setActive] = useState(person.active)
   const [eventIds, setEventIds] = useState(person.eventIds)
   const [details, setDetails] = useState<Record<string, EventDetails>>(person.eventDetails ?? {})
@@ -1732,14 +1736,15 @@ function PersonEditor({ person, events, people, update }: { person: Person; even
           <label className='verdant-switch-line'><input type='checkbox' checked={active} onChange={(e) => setActive(e.target.checked)} /><span>{<LocalizedText text={"Cadastro ativo"} />}</span></label>
         </div>
         <div className='verdant-link-editor'><div><b>{person.kind === 'DJ' ? 'DJs deste evento' : 'Influencers deste evento'}</b><small>{<LocalizedText text={"A seleção é independente; nada é copiado automaticamente entre datas."} />}</small></div>
-          {events.filter((event) => event.active).sort((a, b) => a.date.localeCompare(b.date)).map((event) => {
+          {eventOptions(events, eventMonth).map((event) => {
             const selected = eventIds.includes(event.id)
             const detail = details[event.id] ?? { track: '', time: '', order: 1 }
             return <div className={`verdant-link-row ${selected ? 'selected' : ''}`} key={event.id}>
               <label className='verdant-link-check'><input type='checkbox' checked={selected} onChange={() => toggleEvent(event.id)} /><span><b>{event.name}</b><small>{compactDate(event.date)}</small></span></label>
               {selected && <div className='verdant-link-fields'>
                 {person.kind === 'DJ' && <label className='verdant-field'>{<LocalizedText text={"Pista"} />}<input value={detail.track} onChange={(e) => setDetails({ ...details, [event.id]: { ...detail, track: e.target.value } })} placeholder='Pista / ambiente' /></label>}
-                <label className='verdant-field'>{<LocalizedText text={"Horário"} />}<input type='time' value={detail.time} onChange={(e) => setDetails({ ...details, [event.id]: { ...detail, time: e.target.value } })} /></label>
+                <label className='verdant-field'>{<LocalizedText text={person.kind === 'DJ' ? "Primeiro horário" : "Horário"} />}<input type='time' value={detail.time} onChange={(e) => setDetails({ ...details, [event.id]: { ...detail, time: e.target.value } })} /></label>
+                {person.kind === 'DJ' && <label className='verdant-field'>Segundo horário<input type='time' value={detail.secondTime || ''} onChange={(e) => setDetails({ ...details, [event.id]: { ...detail, secondTime: e.target.value } })} /></label>}
                 <label className='verdant-field'>{<LocalizedText text={"Ordem"} />}<input type='number' min='1' value={detail.order} onChange={(e) => setDetails({ ...details, [event.id]: { ...detail, order: Number(e.target.value) } })} /></label>
               </div>}
             </div>
@@ -1826,11 +1831,23 @@ function reportPeople(data: VerdantState, kind: Person['kind']) {
 export function VerdantReports({ data, embedded = false }: { data: VerdantState; embedded?: boolean }) {
   const { translate } = useLanguage()
   const [month, setMonth] = useOperationMonth(!embedded)
-  const reportEvents = data.events.filter(item => month ? item.date.startsWith(month) : item.active)
+  const reportEvents = eventOptions(data.events, month, new URLSearchParams(window.location.search).get('event') || '')
   const period = monthRange(month)
   const admin = useAuthStore(state => state.auth.user?.role.includes('admin'))
-  const [eventId, setEventId] = useOperationFilter('event', month ? '' : data.events.find((event) => event.active)?.id || '', !embedded)
+  const [eventId, setEventId] = useOperationFilter('event', month ? '' : eventOptions(data.events)[0]?.id || '', !embedded)
   const [lineDirty, setLineDirty] = useState(false)
+  function selectReportEvent(value: string) {
+    if (lineDirty && !window.confirm(translate('Descartar as alterações não salvas da line para trocar de evento?'))) return
+    setLineDirty(false)
+    setEventId(value)
+  }
+  function selectReportMonth(value: string) {
+    if (lineDirty && !window.confirm(translate('Descartar as alterações não salvas da line para trocar de mês?'))) return
+    setLineDirty(false)
+    setMonth(value)
+    if (embedded) setEventId('')
+  }
+
   const [lineSort, setLineSort] = useState<'order' | 'time'>('order')
   const [lineTrack, setLineTrack] = useState('')
   const scopeEvents = reportEvents.filter(item => !eventId || item.id === eventId)
@@ -1944,14 +1961,16 @@ export function VerdantReports({ data, embedded = false }: { data: VerdantState;
     <>
       {embedded ? <div className='verdant-page-heading'><div><div className='verdant-eyebrow'>{<LocalizedText text={"CENTRAL VERDANT"} />}</div><h2>{<LocalizedText text={"Relatórios"} />}</h2><p>{<LocalizedText text={"Imprima ou salve em PDF, ou exporte os dados em CSV."} />}</p></div></div> : <SectionHeading section='exportacoes' />}
       {!embedded && <EventWorkflowNav event={event} />}
-      <Card className='mb-4'><CardHeader><CardTitle>{<LocalizedText text={"Evento e timbrado"} />}</CardTitle><CardDescription>{<LocalizedText text={"Escolha um mês inteiro ou um evento. O timbrado é configurado individualmente por evento."} />}</CardDescription></CardHeader><CardContent className='grid gap-3 sm:grid-cols-3'><MonthFilter value={month} onChange={value => { setMonth(value); if (embedded) setEventId('') }} /><label className='verdant-field'>{<LocalizedText text={"Evento"} />}<select aria-label={translate('Evento dos relatórios')} value={eventId} onChange={(e) => setEventId(e.target.value)}><option value=''>{month ? 'Todos os eventos do mês' : <LocalizedText text='Selecione um evento' />}</option>{reportEvents.slice().sort((a, b) => a.date.localeCompare(b.date)).map((item) => <option key={item.id} value={item.id}>{compactDate(item.date)} · {item.name}</option>)}</select></label>{event && <label className='verdant-field'>{<LocalizedText text={"Timbrado deste evento"} />}<select value={event.letterheadId ?? ''} onChange={(e) => saveLetterhead(e.target.value)}>{letterheadOptions.map((item) => <option key={item.id || 'none'} value={item.id}>{item.label}</option>)}</select></label>}</CardContent></Card>
+      <Card className='mb-4'><CardHeader><CardTitle>{<LocalizedText text={"Evento e timbrado"} />}</CardTitle><CardDescription>{<LocalizedText text={"Escolha um mês inteiro ou um evento. O timbrado é configurado individualmente por evento."} />}</CardDescription></CardHeader><CardContent className='grid gap-3 sm:grid-cols-3'><MonthFilter value={month} onChange={selectReportMonth} /><label className='verdant-field'>{<LocalizedText text={"Evento"} />}<select aria-label={translate('Evento dos relatórios')} value={eventId} onChange={(e) => selectReportEvent(e.target.value)}><option value=''>{month ? 'Todos os eventos do mês' : <LocalizedText text='Selecione um evento' />}</option>{reportEvents.slice().sort((a, b) => a.date.localeCompare(b.date)).map((item) => <option key={item.id} value={item.id}>{compactDate(item.date)} · {item.name}</option>)}</select></label>{event && <label className='verdant-field'>{<LocalizedText text={"Timbrado deste evento"} />}<select value={event.letterheadId ?? ''} onChange={(e) => saveLetterhead(e.target.value)}>{letterheadOptions.map((item) => <option key={item.id || 'none'} value={item.id}>{item.label}</option>)}</select></label>}</CardContent></Card>
       {!hasScope && <p className='mb-4 text-sm text-muted-foreground' role='status'>Selecione um evento para liberar os relatórios da noite. A lista geral reúne todos os eventos ativos.</p>}
       <p className='mb-4 text-sm text-muted-foreground'>Abra um card para consultar, organizar e exportar. O evento selecionado se aplica aos relatórios da noite.</p>
       <div className='verdant-export-grid'>
         <ReportExportCard icon={<Printer size={18} />} title='Lista de portaria' description='Nomes inscritos no evento, organizados por lista e profissional.' count={doorCsvRows.length} countLabel='nomes na lista' onPrint={() => { void downloadReportPdf() }} onCsv={() => csvDownload(`verdant-portaria-${event?.date || month || 'evento'}.csv`, [['Lista', 'Profissional / categoria', 'Nome'], ...doorCsvRows])} disabled={!hasScope || pdfBusy} />
         <ReportExportCard icon={<FileSpreadsheet size={18} />} title={month ? `Lista geral · ${month}` : 'Lista geral (todos os eventos)'} description='Inscrições dos eventos do período selecionado, em PDF ou CSV.' count={periodRegistrations.length} countLabel='inscrições'         onPrint={() => { void downloadReportPdf('geral') }} disabled={pdfBusy} onCsv={exportGeneral} />
         <ReportExportCard icon={<FileSpreadsheet size={18} />} title='Leads com consentimento' description='Contatos que aceitaram novidades: nome, WhatsApp e e-mail.' count={leads.length} countLabel='contatos autorizados' onPrint={() => { void downloadReportPdf('leads') }} onCsv={exportLeads} disabled={!hasScope || pdfBusy} />
-        <ReportExportCard icon={<Music2 size={18} />} title='DJs' description='Lista de convidados, line por pista, ordem e horários em um só lugar.' count={lineRows.length} countLabel='participações na line' confirmClose={lineDirty} onClosed={() => setLineDirty(false)} onPrint={() => { void downloadReportPdf('line') }} onCsv={() => csvDownload(`verdant-line-djs-${event?.date || month || 'evento'}.csv`, [['Data', 'Evento', 'Pista', 'Ordem', 'DJ', 'Primeiro horário', 'Segundo horário'], ...printableLine.map(row => [row.eventDate, row.eventName, row.track, String(row.order), row.name, row.time, row.secondTime || ''])])} disabled={!hasScope || pdfBusy || !printableLine.length}><label className='verdant-field'>Pista<select value={lineTrack} onChange={e=>setLineTrack(e.target.value)}><option value=''>Todas as pistas</option><option>SKY</option><option>LAND</option></select></label><label className='verdant-field'>Organizar impressão<select value={lineSort} onChange={e => setLineSort(e.target.value as 'order' | 'time')}><option value='order'>Ordem 1, 2, 3… por pista</option><option value='time'>Horário da noite por pista</option></select></label>
+        <ReportExportCard icon={<Music2 size={18} />} title='DJs' description='Lista de convidados, line por pista, ordem e horários em um só lugar.' count={lineRows.length} countLabel='participações na line' confirmClose={lineDirty} onClosed={() => setLineDirty(false)} onPrint={() => { void downloadReportPdf('line') }} onCsv={() => csvDownload(`verdant-line-djs-${event?.date || month || 'evento'}.csv`, [['Data', 'Evento', 'Pista', 'Ordem', 'DJ', 'Primeiro horário', 'Segundo horário'], ...printableLine.map(row => [row.eventDate, row.eventName, row.track, String(row.order), row.name, row.time, row.secondTime || ''])])} disabled={!hasScope || pdfBusy || !printableLine.length}>
+          <div className='grid gap-3 sm:grid-cols-2'><MonthFilter value={month} onChange={selectReportMonth} /><label className='verdant-field'>Evento dos DJs<select aria-label='Evento dos DJs' disabled={pdfBusy} value={eventId} onChange={e => selectReportEvent(e.target.value)}><option value=''>{month ? 'Todos os eventos do mês' : 'Selecione um evento'}</option>{reportEvents.slice().sort((a,b) => a.date.localeCompare(b.date)).map(item => <option key={item.id} value={item.id}>{compactDate(item.date)} · {item.name}</option>)}</select></label></div>
+          <label className='verdant-field'>Pista<select value={lineTrack} onChange={e=>setLineTrack(e.target.value)}><option value=''>Todas as pistas</option><option>SKY</option><option>LAND</option></select></label><label className='verdant-field'>Organizar impressão<select value={lineSort} onChange={e => setLineSort(e.target.value as 'order' | 'time')}><option value='order'>Ordem 1, 2, 3… por pista</option><option value='time'>Horário da noite por pista</option></select></label>
           <section className='space-y-3 rounded-lg border p-4'><h3 className='font-semibold'>Convidados dos DJs</h3><p className='text-sm text-muted-foreground'>{djGuestRows.length} inscritos vinculados aos DJs</p><div className='verdant-export-actions'><Button disabled={!hasScope || pdfBusy} onClick={() => void downloadReportPdf('djs')}>Gerar PDF de convidados</Button><Button variant='outline' disabled={!hasScope || pdfBusy} onClick={() => exportPeople('DJ')}>Exportar CSV de convidados</Button></div></section>
           {aggregate && <p className='text-sm text-muted-foreground'>Para editar a line, selecione um evento. As exportações abaixo incluem todos os eventos do mês.</p>}
           {event && <DjLineEditor key={`${eventId}-${data.revision}`} data={data} eventId={eventId} update={update} embedded onDirtyChange={setLineDirty} />}

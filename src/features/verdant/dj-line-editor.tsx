@@ -112,7 +112,7 @@ export function DjLineEditor({
               <tbody>
                 {visible.map((row) => (
                   <tr key={row.originalId}>
-                    <td>
+                    <td data-label="DJ / substituir">
                       <select
                         aria-label={`DJ da posição de ${row.name}`}
                         value={row.id}
@@ -152,7 +152,7 @@ export function DjLineEditor({
                           ))}
                       </select>
                     </td>
-                    <td>
+                    <td data-label="Pista">
                       <select
                         aria-label={`Pista de ${row.name}`}
                         value={row.track}
@@ -171,7 +171,7 @@ export function DjLineEditor({
                         <option>LAND</option>
                       </select>
                     </td>
-                    <td>
+                    <td data-label="Ordem">
                       <input
                         aria-label={`Ordem de ${row.name}`}
                         type='number'
@@ -186,7 +186,7 @@ export function DjLineEditor({
                         }
                       />
                     </td>
-                    <td>
+                    <td data-label="Primeiro horário">
                       <input
                         aria-label={`Primeiro horário de ${row.name}`}
                         placeholder='23:00'
@@ -198,7 +198,7 @@ export function DjLineEditor({
                         }
                       />
                     </td>
-                    <td>
+                    <td data-label="Segundo horário">
                       <input
                         aria-label={`Segundo horário de ${row.name}`}
                         type='time'
@@ -247,6 +247,7 @@ export function DjLineEditor({
               disabled={busy}
               variant='outline'
               onClick={() => {
+                onDirtyChange?.(true)
                 const counts = new Map<string, number>()
                 setRows((current) =>
                   current.map((row) => {
