@@ -11,7 +11,7 @@ const state = {
 }
 const person = (changes = {}) => ({
   zigId: 'zig-person', name: 'Pessoa Teste', phone: normalizePhone('41999999999'),
-  checkins: 1, sources: new Set(['checkin']), eventIds: new Set(['zig-event']), ...changes,
+  checkins: 1, sources: new Set(['checkin']), eventIds: new Set(['zig-event']), checkinEventIds: new Set(['zig-event']), ...changes,
 })
 test('confirmed Zig check-in creates exactly one admission, including repeated syncs', () => {
   const first = reconcileInfluencerCheckins({}, state, [person()], { 'zig-event': event.id }, 'master')
@@ -24,7 +24,7 @@ test('confirmed Zig check-in creates exactly one admission, including repeated s
 test('purchase without check-in, ambiguous event, and missing link never confirm', () => {
   const buyer = reconcileInfluencerCheckins({}, state, [person({ checkins: 0, sources: new Set(['buyer']) })], { 'zig-event': event.id }, 'master')
   assert.equal(buyer.confirmed.length, 0)
-  assert.equal(reconcileInfluencerCheckins({}, state, [person({ eventIds: new Set(['a','b']) })], {}, 'master').confirmed.length, 0)
+  assert.equal(reconcileInfluencerCheckins({}, state, [person({ checkinEventIds: new Set(['a','b']) })], {}, 'master').confirmed.length, 0)
   assert.equal(reconcileInfluencerCheckins({}, state, [person()], {}, 'master').confirmed.length, 0)
 })
 test('no name-only match and no conflicting influencer attribution', () => {
