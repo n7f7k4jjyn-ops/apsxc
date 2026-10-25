@@ -6,8 +6,8 @@ solicitados até 2,2 segundos depois de aparecer o gráfico do Resumo.
 
 | Medida | Antes (f0fa614b) | Depois |
 | --- | ---: | ---: |
-| JavaScript solicitado, sem compressão | 1.601.092 bytes | 965.827 bytes |
-| Módulo do Resumo, minificado | 385,24 KB | 25,48 KB |
+| JavaScript solicitado, sem compressão | 1.601.092 bytes | 965.918 bytes |
+| Módulo do Resumo, minificado | 385,24 KB | 25,57 KB |
 
 A redução de JavaScript solicitado foi de 39,7%. Essa medida inclui dependências
 compartilhadas e a antiga pré-carga da agenda e inscrições. Não representa uma

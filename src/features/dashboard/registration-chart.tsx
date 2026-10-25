@@ -8,13 +8,13 @@ export function RegistrationChart({
   label: string
 }) {
   const max = Math.max(1, ...buckets.map((bucket) => bucket.total))
-  const width = 600
+  const width = 360
   const height = 180
   const left = 30
   const plotWidth = width - left - 8
   const plotHeight = height - 30
   const step = plotWidth / Math.max(1, buckets.length)
-  const tickEvery = Math.max(1, Math.ceil(buckets.length / 10))
+  const tickEvery = Math.max(1, Math.ceil(buckets.length / 7))
   return (
     <svg
       viewBox={`0 0 ${width} ${height}`}
@@ -23,25 +23,28 @@ export function RegistrationChart({
       className='h-40 w-full min-w-0 sm:h-[200px]'
     >
       <title>{label}</title>
-      {[0, 0.5, 1].map((fraction) => (
-        <g key={fraction}>
+      <desc>
+        {buckets.map((bucket) => `${bucket.name}: ${bucket.total}`).join('; ')}
+      </desc>
+      {[...new Set([0, Math.ceil(max / 2), max])].map((value) => (
+        <g key={value}>
           <line
             x1={left}
             x2={width}
-            y1={plotHeight * (1 - fraction)}
-            y2={plotHeight * (1 - fraction)}
+            y1={plotHeight * (1 - value / max)}
+            y2={plotHeight * (1 - value / max)}
             stroke='currentColor'
             opacity='.15'
             strokeDasharray='3 3'
           />
           <text
             x={left - 6}
-            y={plotHeight * (1 - fraction) + 4}
+            y={plotHeight * (1 - value / max) + 4}
             textAnchor='end'
-            fontSize='10'
+            fontSize='12'
             fill='currentColor'
           >
-            {Math.round(max * fraction)}
+            {value}
           </text>
         </g>
       ))}
@@ -65,7 +68,7 @@ export function RegistrationChart({
                 x={x + step / 2}
                 y={height - 10}
                 textAnchor='middle'
-                fontSize='10'
+                fontSize='12'
                 fill='currentColor'
               >
                 {bucket.name}
