@@ -257,6 +257,7 @@ function AdminFinance() {
   const [tab, setTab] = useState<'ledger' | 'cash' | 'summary' | 'influencer-payouts' | 'influencer-report'>('ledger')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkEvent, setBulkEvent] = useState('')
+  const [selectionDialog, setSelectionDialog] = useState<{ kind: 'link' | 'delete'; entries: FinanceEntry[]; revision: number } | null>(null)
   const [selectedMonth, setSelectedMonth] = useOperationMonth(true, false)
   const [from, setFrom] = useState(() => monthRange(selectedMonth).from)
   const [to, setTo] = useState(() => monthRange(selectedMonth).to)
@@ -429,34 +430,43 @@ function AdminFinance() {
     setFrom(key(monday))
     setTo(key(new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6)))
   }
-  async function bulkLink() {
-    if (disabled || lock.current || !data || !selectedIds.size) return
-    if (!window.confirm(`Vincular ${selectedIds.size} lançamento(s) a ${bulkEvent ? 'este evento' : 'nenhum evento'}? Nenhum valor é alterado; o histórico registra a mudança.`)) return
+  async function confirmSelection() {
+    if (disabled || lock.current || !data || !selectionDialog) return
     lock.current = true
     setBusy(true)
     setError('')
     setNotice('')
+    const deleting = selectionDialog.kind === 'delete'
     try {
-      const response = await fetch('/api/finance', {
-        method: 'POST',
-        credentials: 'same-origin',
+      const ids = selectionDialog.entries.map(entry => entry.id)
+      const response = await fetch(deleting ? '/api/finance/delete' : '/api/finance', {
+        method: 'POST', credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ revision: data.revision, bulk: { ids: [...selectedIds], eventId: bulkEvent } }),
+        body: JSON.stringify(deleting
+          ? { revision: selectionDialog.revision, ids, confirm: true }
+          : { revision: selectionDialog.revision, bulk: { ids, eventId: bulkEvent } }),
       })
       const result = await response.json()
       if (response.status === 409) {
-        setConflict(true)
-        setError('Os dados foram alterados por outra pessoa. Recarregamos a versão atual; selecione de novo e reaplique.')
+        setSelectionDialog(null)
+        setSelectedIds(new Set())
         await load()
+        setError('O financeiro foi alterado. Confira os dados e selecione novamente. Nada foi reenviado.')
         return
       }
-      if (!response.ok) throw new Error(result.error || 'Não foi possível vincular em massa.')
+      if (!response.ok) throw new Error(result.error || 'Não foi possível concluir a operação.')
       if (!isLedger(result)) throw new Error('Resposta da gravação inválida.')
-      setData((current) => current && { ...current, revision: result.revision, entries: result.entries })
+      setData(current => current && { ...current, revision: result.revision, entries: result.entries })
       setSelectedIds(new Set())
-      setNotice(`${(result as { updated?: number }).updated ?? 0} lançamento(s) vinculado(s); ${result.skipped ?? 0} já estavam nesse evento.`)
+      setSelectionDialog(null)
+      setNotice(deleting
+        ? `${ids.length} lançamento(s) excluído(s). Backup salvo antes da exclusão. Nenhuma movimentação bancária foi realizada.`
+        : 'Vínculos de evento atualizados.')
     } catch (cause) {
-      setError(message(cause))
+      setError(`${message(cause)} Confira a lista atual antes de tentar novamente.`)
+      setSelectionDialog(null)
+      setSelectedIds(new Set())
+      await load()
     } finally {
       lock.current = false
       if (active.current) setBusy(false)
@@ -577,6 +587,7 @@ function AdminFinance() {
       (!to || entry.dueDate <= to)
   )
   const visible = sortRows(tab === 'cash' ? (report?.cash || []).filter(matches) : ledger, entry => sortKey === 'event' ? data?.events.find(event => event.id === entry.eventId)?.name : sortKey === 'description' ? `${entry.description} ${entry.counterparty}` : sortKey === 'type' ? `${financeTypes[entry.type]} ${financeCategories[entry.category]}` : sortKey === 'status' ? `${financeStatuses[entry.status]} ${entry.settledDate}` : entry[sortKey], sortDirection)
+  const selectedEntries = visible.filter(entry => selectedIds.has(entry.id))
   const editing = data?.entries.find((entry) => entry.id === editingId)
   const editable = !editing || editing.status === 'pending'
   const selected = data?.beneficiaries.find(
@@ -809,20 +820,17 @@ function AdminFinance() {
                   checked={visible.length > 0 && visible.every((entry) => selectedIds.has(entry.id))}
                   onChange={(e) => setSelectedIds(e.target.checked ? new Set(visible.map((entry) => entry.id)) : new Set())}
                 />{' '}
-                Selecionar todos do filtro ({selectedIds.size})
+                Selecionar todos do filtro ({selectedEntries.length})
               </label>
-              <select aria-label='Evento para vincular' value={bulkEvent} onChange={(e) => setBulkEvent(e.target.value)}>
-                <option value=''>Sem evento</option>
-                {eventOptions.map((event) => (
-                  <option key={event.id} value={event.id}>
-                    {eventLabel(event)}
-                  </option>
-                ))}
-              </select>
-              <Button variant='outline' disabled={disabled || !selectedIds.size} onClick={() => void bulkLink()}>
+              <Button variant='outline' disabled={disabled || !selectedEntries.length || selectedEntries.length > 1000} onClick={() => setSelectionDialog({ kind: 'link', entries: selectedEntries, revision: data!.revision })}>
                 Vincular evento às selecionadas
               </Button>
+              <Button variant='destructive' disabled={disabled || !selectedEntries.length || selectedEntries.length > 1000} onClick={() => setSelectionDialog({ kind: 'delete', entries: selectedEntries, revision: data!.revision })}>
+                Excluir selecionados ({selectedEntries.length})
+              </Button>
+              {selectedEntries.length > 1000 && <p role='alert'>Selecione até 1000 lançamentos por operação.</p>}
             </div>
+            <div className='finance-ledger-scroll' role='region' aria-label='Lista de lançamentos' tabIndex={0}>
             <table>
               <caption>
                 {tab === 'cash'
@@ -884,6 +892,9 @@ function AdminFinance() {
                         >
                           Detalhes / editar
                         </Button>
+                        <Button variant='destructive' disabled={disabled} aria-label={`Excluir ${entry.description}`} onClick={() => { setError(''); setSelectionDialog({ kind: 'delete', entries: [entry], revision: data!.revision }) }}>
+                          Excluir
+                        </Button>
                         {entry.status === 'pending' && (
                           <>
                             <Button
@@ -927,6 +938,7 @@ function AdminFinance() {
                 ))}
               </tbody>
             </table>
+            </div>
             {!visible.length && <p>Nenhum lançamento neste filtro.</p>}
           </div>
         )}
@@ -1086,6 +1098,38 @@ function AdminFinance() {
         </details>
       </Card>
       </details>
+      <Dialog open={!!selectionDialog} onOpenChange={value => { if (!value && !busy) setSelectionDialog(null) }}>
+        <DialogContent className='finance-dialog'>
+          <DialogHeader>
+            <DialogTitle>{selectionDialog?.kind === 'delete' ? 'Excluir lançamentos' : 'Vincular evento'}</DialogTitle>
+            <DialogDescription>
+              {selectionDialog?.entries.length || 0} lançamento(s) selecionado(s).
+              {selectionDialog?.kind === 'delete'
+                ? ' Os registros serão removidos do financeiro e os totais serão recalculados. Um backup completo será salvo antes; se falhar, nada será excluído. Nenhum pagamento ou estorno bancário será realizado.'
+                : ' Escolha o evento para esta seleção. Os valores permanecem iguais.'}
+            </DialogDescription>
+          </DialogHeader>
+          {error && <p role='alert'>{error}</p>}
+          {selectionDialog?.kind === 'link' && <Field id='finance-bulk-event' label='Evento para vincular'>
+            <select id='finance-bulk-event' value={bulkEvent} disabled={busy} onChange={e => setBulkEvent(e.target.value)}>
+              <option value=''>Sem evento</option>
+              {eventOptions.map(event => <option key={event.id} value={event.id}>{eventLabel(event)}</option>)}
+            </select>
+          </Field>}
+          <ul className='finance-selection-preview' aria-label='Lançamentos selecionados'>
+            {selectionDialog?.entries.map(entry => <li key={entry.id}>
+              <b>{entry.description}</b><span>{financeTypes[entry.type]} · {formatCents(entry.amountCents)} · {financeStatuses[entry.status]}</span>
+              <small>{entry.externalId.startsWith('zig:sales:') ? 'Zig · consumo antigo' : entry.counterparty}</small>
+            </li>)}
+          </ul>
+          <div className='finance-actions'>
+            <Button variant={selectionDialog?.kind === 'delete' ? 'destructive' : 'default'} disabled={disabled} onClick={() => void confirmSelection()}>
+              {busy ? 'Processando…' : selectionDialog?.kind === 'delete' ? `Confirmar exclusão de ${selectionDialog.entries.length}` : 'Confirmar vínculo'}
+            </Button>
+            <Button variant='outline' disabled={busy} onClick={() => setSelectionDialog(null)}>Voltar</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       <Dialog
         open={!!draft}
         onOpenChange={(value) => {
@@ -1332,7 +1376,7 @@ function AdminFinance() {
           if (!value && !busy) setAction(null)
         }}
       >
-        <DialogContent>
+        <DialogContent className='finance-dialog'>
           <DialogHeader>
             <DialogTitle>
               {action?.kind === 'settle'
