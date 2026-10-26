@@ -15,7 +15,7 @@ import { validateTeamRegistration } from './lib/team-registrations.mjs'
 import { validateJobApplication, ROLES as TEAM_ROLES, DAYS as TEAM_DAYS } from './lib/job-applications.mjs'
 import { migrateVerdantState } from './lib/verdant-state-migration.mjs'
 import { PUBLIC_FORM_META, personalizeFormShareHtml } from './lib/public-form-meta.mjs'
-import { emptyFinance, validateFinanceStore, changeFinance } from './lib/finance.mjs'
+import { emptyFinance, validateFinanceStore, changeFinance, deleteFinance } from './lib/finance.mjs'
 import { confirmInfluencerAdmission, planInfluencerCommissions } from './lib/influencer-commissions.mjs'
 import { reconcileInfluencerCheckins } from './lib/zig-influencer-reconciliation.mjs'
 import { ZIG_BASE_URL, ZigError, createZigClient, validateToken as validZigToken } from './lib/zig-client.mjs'
@@ -544,7 +544,15 @@ async function readFinanceStore() {
   return validateFinanceStore(await readJsonFile(financePath, emptyFinance()))
 }
 
-async function mutateFinance(payload, actor, id) {
+async function mutateFinance(payload, actor, id, deleting = false) {
+  async function prepare(document, references) {
+    if (!deleting) return changeFinance(document, payload, references, actor, id)
+    const result = deleteFinance(document, payload)
+    const backup = `finance-delete-${Date.now()}-${randomBytes(12).toString('hex')}.json`
+    await mkdir(backupDirectory, { recursive: true })
+    await writeFile(path.join(backupDirectory, backup), JSON.stringify({ action: 'finance-delete', actor, at: new Date().toISOString(), ids: payload.ids, finance: document }), { mode: 0o600, flag: 'wx' })
+    return { document: result.document, response: { ...result.document, deleted: result.removed.length, backup } }
+  }
   if (mysqlPool) {
     await initializeFinanceStore()
     const references = await financeReferences()
@@ -552,7 +560,7 @@ async function mutateFinance(payload, actor, id) {
     try {
       await connection.beginTransaction()
       const [rows] = await connection.execute('SELECT payload FROM verdant_app_data WHERE store_key = ? FOR UPDATE', ['finance'])
-      const result = changeFinance(JSON.parse(rows[0].payload), payload, references, actor, id)
+      const result = await prepare(JSON.parse(rows[0].payload), references)
       await connection.execute('UPDATE verdant_app_data SET payload = ?, updated_at = CURRENT_TIMESTAMP WHERE store_key = ?', [JSON.stringify(result.document), 'finance'])
       await connection.commit()
       return result.response
@@ -560,7 +568,7 @@ async function mutateFinance(payload, actor, id) {
   }
   const operation = financeQueue.then(async () => {
     const document = validateFinanceStore(await readJsonFile(financePath, emptyFinance()))
-    const result = changeFinance(document, payload, await financeReferences(), actor, id)
+    const result = await prepare(document, await financeReferences())
     await writeJsonFile(financePath, result.document)
     return result.response
   })
@@ -1694,6 +1702,10 @@ const server = createServer(async (request, response) => {
       if (request.headers['sec-fetch-site'] === 'cross-site' || (origin && ![
         `http://${request.headers.host}`, `https://${request.headers.host}`,
       ].includes(origin))) return sendJson(response, 403, { error: 'Origem não autorizada.' })
+      if (request.method === 'POST' && url.pathname === '/api/finance/delete') {
+        const result = await mutateFinance(await bodyJson(request, 600_000), user.username, undefined, true)
+        return sendJson(response, 200, result)
+      }
       if (request.method === 'GET' && url.pathname === '/api/finance/influencer-admissions') {
         const [state, operations] = await Promise.all([readState(), readOperations()])
         response.setHeader('Cache-Control', 'no-store')

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { scryptSync } from 'node:crypto'
 import { once } from 'node:events'
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -74,7 +74,7 @@ test('finance API authorization, atomic imports, concurrency, audit and restart 
       { id: 'new', name: 'Equipe', whatsapp: '41999999999', pixKey: 'current-pix', createdAt: '2026-10-01T00:00:00Z' },
     ]))
     for (const cookie of ['', await login('operator'), await login('viewer')]) {
-      for (const [method, endpoint, body] of [['GET', '', undefined], ['POST', '', { revision: 0, entries: [draft()] }], ['PUT', '/missing', { revision: 0, ...draft() }]]) {
+      for (const [method, endpoint, body] of [['GET', '', undefined], ['POST', '', { revision: 0, entries: [draft()] }], ['PUT', '/missing', { revision: 0, ...draft() }], ['POST', '/delete', { revision: 0, ids: ['missing'], confirm: true }]]) {
         const response = await fetch(`${url}/api/finance${endpoint}`, { method, headers: { Cookie: cookie, 'Content-Type': 'application/json' }, body: body && JSON.stringify(body) })
         assert.equal(response.status, cookie ? 403 : 401)
         assert.equal(response.headers.get('cache-control'), 'no-store')
@@ -152,6 +152,34 @@ test('finance API authorization, atomic imports, concurrency, audit and restart 
     assert.equal(commissionLedger.entries.at(-1).amountCents, 300)
     assert.equal(commissionLedger.entries.at(-1).category, 'influencer')
     assert.equal((await (await commissionPost('influencer-commissions', { revision: commissionLedger.revision })).json()).imported, 0)
+    const deletePost = body => commissionPost('delete', body)
+    const ids = commissionLedger.entries.slice(0, 2).map(entry => entry.id)
+    const deletion = { revision: commissionLedger.revision, ids, confirm: true }
+    assert.equal((await deletePost({ ...deletion, confirm: false })).status, 400)
+    assert.equal((await deletePost({ ...deletion, ids: [ids[0], ids[0]] })).status, 400)
+    assert.equal((await deletePost({ ...deletion, ids: [ids[0], 'missing'] })).status, 409)
+    assert.equal((await deletePost({ ...deletion, revision: deletion.revision - 1 })).status, 409)
+    // Backup failure must prevent every deletion, including settled entries.
+    await rename(env.VERDANT_BACKUP_DIR, env.VERDANT_BACKUP_DIR + '.saved')
+    await writeFile(env.VERDANT_BACKUP_DIR, 'not a directory')
+    assert.equal((await deletePost(deletion)).status, 500)
+    assert.deepEqual((await (await get()).json()).entries, commissionLedger.entries)
+    await rm(env.VERDANT_BACKUP_DIR)
+    await rename(env.VERDANT_BACKUP_DIR + '.saved', env.VERDANT_BACKUP_DIR)
+    const deletedResponse = await deletePost(deletion)
+    assert.equal(deletedResponse.status, 200)
+    const deleted = await deletedResponse.json()
+    assert.equal(deleted.deleted, 2)
+    assert.equal(deleted.revision, deletion.revision + 1)
+    assert.deepEqual(deleted.entries, commissionLedger.entries.filter(entry => !ids.includes(entry.id)))
+    const archived = JSON.parse(await readFile(path.join(env.VERDANT_BACKUP_DIR, deleted.backup), 'utf8'))
+    assert.equal(archived.actor, 'admin')
+    assert.deepEqual(archived.finance.entries, commissionLedger.entries)
+    assert.deepEqual(archived.ids, ids)
+    assert.equal((await deletePost(deletion)).status, 409)
+    await stop()
+    await start()
+    assert.deepEqual((await (await get()).json()).entries, deleted.entries)
     for (const corrupt of ['{ broken', JSON.stringify({ revision: 5, entries: [{ amountCents: 'bad' }] })]) {
       await stop()
       await writeFile(env.VERDANT_FINANCE_FILE, corrupt)

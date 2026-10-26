@@ -30,6 +30,7 @@ jobs:
       - run: node tests/rosters.browser.test.mjs
       - run: node --test tests/mobile-performance.browser.test.mjs
       - run: node --test tests/navigation.browser.test.mjs
+      - run: node --test tests/finance-delete.browser.test.mjs
       - run: node --test tests/production-import.integration.test.mjs
         env:
           PRODUCTION_IMPORT_BROWSER: '1'
